@@ -1,4 +1,4 @@
-package com.inductiveautomation.ignition.examples.ce.components;
+package com.inductiveautomation.ignition.examples.ce.components.input;
 
 import javax.swing.*;
 import java.awt.*;

@@ -1,8 +1,8 @@
-package com.inductiveautomation.ignition.examples.ce.beaninfos;
+package com.inductiveautomation.ignition.examples.ce.beaninfos.input;
 
 import com.inductiveautomation.factorypmi.designer.property.customizers.DynamicPropertyProviderCustomizer;
 import com.inductiveautomation.factorypmi.designer.property.customizers.StyleCustomizer;
-import com.inductiveautomation.ignition.examples.ce.components.IOSButtonComponent;
+import com.inductiveautomation.ignition.examples.ce.components.input.IOSButtonComponent;
 import com.inductiveautomation.vision.api.designer.beans.CommonBeanInfo;
 import com.inductiveautomation.vision.api.designer.beans.VisionBeanDescriptor;
 

@@ -1,4 +1,4 @@
-package com.inductiveautomation.ignition.examples.ce.components;
+package com.inductiveautomation.ignition.examples.ce.components.input;
 
 import javax.swing.*;
 import java.awt.*;
@@ -11,7 +11,7 @@ public class IOSToggleSwitch extends JComponent {
     private float animationProgress = 0f;
     private final Timer animationTimer;
 
-    private Color trackOnColor = new Color(52, 199, 89);
+    private Color trackOnColor = new Color(0, 122, 255);
     private Color trackOffColor = new Color(209, 209, 214);
 
     private final Color KNOB_COLOR = Color.WHITE;

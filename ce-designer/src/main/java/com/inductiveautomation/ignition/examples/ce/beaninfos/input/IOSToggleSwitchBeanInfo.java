@@ -2,33 +2,31 @@
  * Created by Perry Arellano-Jones on 12/11/14.
  * Copyright Inductive Automation 2014
  */
-package com.inductiveautomation.ignition.examples.ce.beaninfos;
+package com.inductiveautomation.ignition.examples.ce.beaninfos.input;
 
 import com.inductiveautomation.factorypmi.designer.property.customizers.DynamicPropertyProviderCustomizer;
 import com.inductiveautomation.factorypmi.designer.property.customizers.StyleCustomizer;
-import com.inductiveautomation.ignition.examples.ce.components.HelloWorldComponent;
+import com.inductiveautomation.ignition.examples.ce.components.input.IOSToggleSwitch;
 import com.inductiveautomation.vision.api.designer.beans.CommonBeanInfo;
 import com.inductiveautomation.vision.api.designer.beans.VisionBeanDescriptor;
-
 
 import java.beans.IntrospectionException;
 
 
-
 /**
- * This BeanInfo class describes the {@link HelloWorldComponent}, which is the component that this example module adds
+ * This BeanInfo class describes the {@link IOSToggleSwitch}, which is the component that this example module adds
  * to the Vision Module
  *
  * @author Carl Gould
  */
-public class HelloWorldComponentBeanInfo extends CommonBeanInfo {
+public class IOSToggleSwitchBeanInfo extends CommonBeanInfo {
 
-    public HelloWorldComponentBeanInfo() {
+    public IOSToggleSwitchBeanInfo() {
         /*
          * Our superclass constructor takes the class of the component we describe and the customizers that are
          * applicable
          */
-        super(HelloWorldComponent.class, DynamicPropertyProviderCustomizer.VALUE_DESCRIPTOR, StyleCustomizer.VALUE_DESCRIPTOR);
+        super(IOSToggleSwitch.class, DynamicPropertyProviderCustomizer.VALUE_DESCRIPTOR, StyleCustomizer.VALUE_DESCRIPTOR);
     }
 
     @Override

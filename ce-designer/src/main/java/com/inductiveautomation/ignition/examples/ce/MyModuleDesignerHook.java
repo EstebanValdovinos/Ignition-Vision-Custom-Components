@@ -3,8 +3,8 @@ package com.inductiveautomation.ignition.examples.ce;
 import com.inductiveautomation.ignition.common.licensing.LicenseState;
 import com.inductiveautomation.ignition.designer.model.AbstractDesignerModuleHook;
 import com.inductiveautomation.ignition.designer.model.DesignerContext;
-import com.inductiveautomation.ignition.examples.ce.components.HelloWorldComponent;
-import com.inductiveautomation.ignition.examples.ce.components.IOSButtonComponent;
+import com.inductiveautomation.ignition.examples.ce.components.input.IOSButtonComponent;
+import com.inductiveautomation.ignition.examples.ce.components.input.IOSToggleSwitch;
 import com.inductiveautomation.vision.api.designer.VisionDesignerInterface;
 import com.inductiveautomation.vision.api.designer.palette.JavaBeanPaletteItem;
 import com.inductiveautomation.vision.api.designer.palette.Palette;
@@ -21,6 +21,8 @@ public class MyModuleDesignerHook extends AbstractDesignerModuleHook {
     public void startup(DesignerContext context, LicenseState activationState) throws Exception {
         // Add the BeanInfo package to the search path
         context.addBeanInfoSearchPath("com.inductiveautomation.ignition.examples.ce.beaninfos");
+        context.addBeanInfoSearchPath("com.inductiveautomation.ignition.examples.ce.beaninfos.input");
+        context.addBeanInfoSearchPath("com.inductiveautomation.ignition.examples.ce.beaninfos.display");
 
         // Add my components to the palette
         VisionDesignerInterface sdk = (VisionDesignerInterface) context
@@ -28,8 +30,8 @@ public class MyModuleDesignerHook extends AbstractDesignerModuleHook {
         if (sdk != null) {
             Palette palette = sdk.getPalette();
 
-            PaletteItemGroup group = palette.addGroup("Example");
-            group.addPaletteItem(new JavaBeanPaletteItem(HelloWorldComponent.class));
+            PaletteItemGroup group = palette.addGroup("Custom Components");
+            group.addPaletteItem(new JavaBeanPaletteItem(IOSToggleSwitch.class));
             group.addPaletteItem(new JavaBeanPaletteItem(IOSButtonComponent.class));
         }
     }
