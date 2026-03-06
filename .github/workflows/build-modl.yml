@@ -1,0 +1,31 @@
+name: Build Ignition Module
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Build module
+        run: mvn -B clean install
+
+      - name: Upload .modl artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ignition-module
+          path: ce-build/target/*.modl
+          if-no-files-found: error
