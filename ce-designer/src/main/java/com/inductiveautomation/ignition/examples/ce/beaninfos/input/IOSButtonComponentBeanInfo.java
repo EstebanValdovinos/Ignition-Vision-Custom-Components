@@ -38,4 +38,22 @@ public class IOSButtonComponentBeanInfo extends CommonBeanInfo {
         bean.setDisplayName("iOS Button");
         bean.setShortDescription("An iOS-style rounded button component.");
     }
+
+    @Override
+    public java.awt.Image getIcon(int kind) {
+        switch (kind) {
+            case java.beans.BeanInfo.ICON_COLOR_16x16:
+            case java.beans.BeanInfo.ICON_MONO_16x16:
+                return new javax.swing.ImageIcon(
+                        getClass().getResource("/images/button_icon.png")
+                ).getImage();
+
+            case java.beans.BeanInfo.ICON_COLOR_32x32:
+            case java.beans.BeanInfo.ICON_MONO_32x32:
+                return new javax.swing.ImageIcon(
+                        getClass().getResource("/images/button_icon.png")
+                ).getImage();
+        }
+        return null;
+    }
 }

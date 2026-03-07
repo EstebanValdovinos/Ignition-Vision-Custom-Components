@@ -73,4 +73,22 @@ public class StatusIndicatorComponentBeanInfo extends CommonBeanInfo {
         bean.setDisplayName("Status Indicator");
         bean.setShortDescription("A display component that shows a colored status indicator with text.");
     }
+    @Override
+    public java.awt.Image getIcon(int kind) {
+        switch (kind) {
+            case java.beans.BeanInfo.ICON_COLOR_16x16:
+            case java.beans.BeanInfo.ICON_MONO_16x16:
+                return new javax.swing.ImageIcon(
+                        getClass().getResource("/images/status_indicator_icon.png")
+                ).getImage();
+
+            case java.beans.BeanInfo.ICON_COLOR_32x32:
+            case java.beans.BeanInfo.ICON_MONO_32x32:
+                return new javax.swing.ImageIcon(
+                        getClass().getResource("/images/status_indicator_icon.png")
+                ).getImage();
+        }
+        return null;
+    }
+
 }

@@ -6,6 +6,7 @@ import com.inductiveautomation.ignition.designer.model.DesignerContext;
 import com.inductiveautomation.ignition.examples.ce.components.input.IOSButtonComponent;
 import com.inductiveautomation.ignition.examples.ce.components.input.IOSToggleSwitch;
 import com.inductiveautomation.ignition.examples.ce.components.display.StatusIndicatorComponent;
+import com.inductiveautomation.ignition.examples.ce.components.input.SlideToConfirmComponent;
 import com.inductiveautomation.vision.api.designer.VisionDesignerInterface;
 import com.inductiveautomation.vision.api.designer.palette.JavaBeanPaletteItem;
 import com.inductiveautomation.vision.api.designer.palette.Palette;
@@ -36,6 +37,7 @@ public class MyModuleDesignerHook extends AbstractDesignerModuleHook {
             group.addPaletteItem(new JavaBeanPaletteItem(IOSToggleSwitch.class));
             group.addPaletteItem(new JavaBeanPaletteItem(IOSButtonComponent.class));
             group.addPaletteItem(new JavaBeanPaletteItem(StatusIndicatorComponent.class));
+            group.addPaletteItem(new JavaBeanPaletteItem(SlideToConfirmComponent.class));
         }
     }
 }
