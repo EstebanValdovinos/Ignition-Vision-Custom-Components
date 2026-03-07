@@ -8,6 +8,7 @@ import com.inductiveautomation.ignition.examples.ce.components.input.IOSToggleSw
 import com.inductiveautomation.ignition.examples.ce.components.display.StatusIndicatorComponent;
 import com.inductiveautomation.ignition.examples.ce.components.input.SlideToConfirmComponent;
 import com.inductiveautomation.ignition.examples.ce.components.display.TeslaLoadingSpinnerComponent;
+import com.inductiveautomation.ignition.examples.ce.components.display.ThermometerIndicatorComponent;
 import com.inductiveautomation.vision.api.designer.VisionDesignerInterface;
 import com.inductiveautomation.vision.api.designer.palette.JavaBeanPaletteItem;
 import com.inductiveautomation.vision.api.designer.palette.Palette;
@@ -40,6 +41,7 @@ public class MyModuleDesignerHook extends AbstractDesignerModuleHook {
             group.addPaletteItem(new JavaBeanPaletteItem(StatusIndicatorComponent.class));
             group.addPaletteItem(new JavaBeanPaletteItem(SlideToConfirmComponent.class));
             group.addPaletteItem(new JavaBeanPaletteItem(TeslaLoadingSpinnerComponent.class));
+            group.addPaletteItem(new JavaBeanPaletteItem(ThermometerIndicatorComponent.class));
         }
     }
 }
