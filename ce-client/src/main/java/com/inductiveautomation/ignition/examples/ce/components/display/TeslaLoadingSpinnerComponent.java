@@ -18,12 +18,13 @@ public class TeslaLoadingSpinnerComponent extends JComponent {
     private String text = "";
 
     private float animationProgress = 0f;   // 0.0 to 1.0
+    private float motionPhase = 0f;
     private final Timer animationTimer;
 
     private Image defaultBundledIcon;
 
     public TeslaLoadingSpinnerComponent() {
-        setPreferredSize(new Dimension(65, 65));
+        setPreferredSize(new Dimension(60, 60));
         setMinimumSize(new Dimension(50, 50));
         setBackground(new Color(0, 0, 0, 0));
         setForeground(Color.GRAY);
@@ -33,10 +34,23 @@ public class TeslaLoadingSpinnerComponent extends JComponent {
         defaultBundledIcon = loadBundledDefaultIcon();
 
         animationTimer = new Timer(16, e -> {
-            animationProgress += 0.020f; //0.0125f;
+            motionPhase += 0.045f;
+            if (motionPhase >= (float) (Math.PI * 2)) {
+                motionPhase -= (float) (Math.PI * 2);
+            }
+
+            float baseSpeed = 0.018f;
+            float speedVariation = 0.006f;
+            float easedSpeed = baseSpeed + ((float) Math.sin(motionPhase) * speedVariation);
+
+            animationProgress += easedSpeed;
+
             if (animationProgress >= 1f) {
                 animationProgress -= 1f;
+            } else if (animationProgress < 0f) {
+                animationProgress += 1f;
             }
+
             repaint();
         });
         animationTimer.start();
@@ -417,7 +431,7 @@ public class TeslaLoadingSpinnerComponent extends JComponent {
 
     @Override
     public Dimension getPreferredSize() {
-        return new Dimension(65, 65);
+        return new Dimension(60, 60);
     }
 
     @Override

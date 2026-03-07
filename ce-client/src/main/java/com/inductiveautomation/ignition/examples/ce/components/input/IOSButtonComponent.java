@@ -1,27 +1,46 @@
 package com.inductiveautomation.ignition.examples.ce.components.input;
 
+import com.inductiveautomation.ignition.client.images.ImageLoader;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.geom.RoundRectangle2D;
+import java.awt.image.BufferedImage;
 
 public class IOSButtonComponent extends JComponent {
+
+    public static final int ICON_LEFT = 0;
+    public static final int ICON_RIGHT = 1;
 
     private String text = "Submit";
     private boolean pressed = false;
     private int cornerRadius = -1;
 
+    private String iconPath = "";
+    private int iconLocation = ICON_LEFT;
+    private Color iconColor = Color.WHITE;
+    private int iconSize = 24;
+    private int iconGap = 50;
+
+    private Color strokeColor = new Color(0,0,0,0); // transparent default
+    private float strokeWidth = 0f;
+
     public IOSButtonComponent() {
-        setPreferredSize(new Dimension(140, 36));
+        setPreferredSize(new Dimension(230, 40));
         setMinimumSize(new Dimension(80, 28));
+
         setBackground(new Color(0, 122, 255));
         setForeground(Color.WHITE);
+
         setFont(new Font("Dialog", Font.BOLD, 14));
         setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         setFocusable(true);
         setOpaque(false);
 
         addMouseListener(new MouseAdapter() {
+
             @Override
             public void mousePressed(MouseEvent e) {
                 if (isEnabled() && SwingUtilities.isLeftMouseButton(e)) {
@@ -32,16 +51,13 @@ public class IOSButtonComponent extends JComponent {
 
             @Override
             public void mouseReleased(MouseEvent e) {
-                if (pressed) {
-                    pressed = false;
-                    repaint();
-                }
+                pressed = false;
+                repaint();
             }
 
             @Override
             public void mouseClicked(MouseEvent e) {
                 if (isEnabled() && SwingUtilities.isLeftMouseButton(e)) {
-                    requestFocusInWindow();
                     firePropertyChange("buttonClicked", false, true);
                 }
             }
@@ -49,7 +65,7 @@ public class IOSButtonComponent extends JComponent {
     }
 
     // ------------------------
-    // Text property
+    // Properties
     // ------------------------
 
     public String getText() {
@@ -58,68 +74,70 @@ public class IOSButtonComponent extends JComponent {
 
     public void setText(String text) {
         String old = this.text;
-        if (old == null ? text == null : old.equals(text)) {
-            return;
-        }
-
         this.text = text;
         firePropertyChange("text", old, text);
         repaint();
     }
 
-    // ------------------------
-    // Enabled property
-    // ------------------------
+    public String getIconPath() {
+        return iconPath;
+    }
 
-    @Override
-    public void setEnabled(boolean enabled) {
-        boolean old = isEnabled();
-        super.setEnabled(enabled);
+    public void setIconPath(String iconPath) {
+        String old = this.iconPath;
+        this.iconPath = iconPath;
+        firePropertyChange("iconPath", old, iconPath);
+        repaint();
+    }
 
-        firePropertyChange("enabled", old, enabled);
+    public int getIconLocation() {
+        return iconLocation;
+    }
 
-        if (enabled) {
-            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        } else {
-            setCursor(Cursor.getDefaultCursor());
-            pressed = false;
+    public void setIconLocation(int iconLocation) {
+        int old = this.iconLocation;
+
+        if (iconLocation != ICON_LEFT && iconLocation != ICON_RIGHT) {
+            iconLocation = ICON_LEFT;
         }
 
+        this.iconLocation = iconLocation;
+        firePropertyChange("iconLocation", old, this.iconLocation);
         repaint();
     }
 
-    // ------------------------
-    // Appearance
-    // ------------------------
+    public Color getIconColor() {
+        return iconColor;
+    }
 
-    @Override
-    public void setBackground(Color bg) {
-        Color old = getBackground();
-        super.setBackground(bg);
-        firePropertyChange("background", old, bg);
+    public void setIconColor(Color iconColor) {
+        Color old = this.iconColor;
+        this.iconColor = iconColor;
+        firePropertyChange("iconColor", old, iconColor);
         repaint();
     }
 
-    @Override
-    public void setForeground(Color fg) {
-        Color old = getForeground();
-        super.setForeground(fg);
-        firePropertyChange("foreground", old, fg);
+    public int getIconSize() {
+        return iconSize;
+    }
+
+    public void setIconSize(int iconSize) {
+        int old = this.iconSize;
+        this.iconSize = Math.max(0, iconSize);
+        firePropertyChange("iconSize", old, this.iconSize);
         repaint();
     }
 
-    @Override
-    public void setFont(Font font) {
-        Font old = getFont();
-        super.setFont(font);
-        firePropertyChange("font", old, font);
-        revalidate();
-        repaint();
+    public int getIconGap() {
+        return iconGap;
     }
 
-    // ------------------------
-    // Corner radius
-    // ------------------------
+    public void setIconGap(int iconGap) {
+        int old = this.iconGap;
+        this.iconGap = Math.max(0, iconGap);
+        firePropertyChange("iconGap", old, this.iconGap);
+        repaint();
+    }
 
     public int getCornerRadius() {
         return cornerRadius;
@@ -127,27 +145,29 @@ public class IOSButtonComponent extends JComponent {
 
     public void setCornerRadius(int cornerRadius) {
         int old = this.cornerRadius;
-        if (old == cornerRadius) {
-            return;
-        }
-
-        this.cornerRadius = Math.max(-1, cornerRadius);
-        firePropertyChange("cornerRadius", old, this.cornerRadius);
+        this.cornerRadius = cornerRadius;
+        firePropertyChange("cornerRadius", old, cornerRadius);
         repaint();
     }
 
     // ------------------------
-    // Size
+    // Enabled
     // ------------------------
 
     @Override
-    public Dimension getPreferredSize() {
-        return new Dimension(140, 36);
-    }
+    public void setEnabled(boolean enabled) {
+        boolean old = isEnabled();
+        super.setEnabled(enabled);
+        firePropertyChange("enabled", old, enabled);
 
-    @Override
-    public Dimension getMinimumSize() {
-        return new Dimension(80, 28);
+        if (!enabled) {
+            pressed = false;
+            setCursor(Cursor.getDefaultCursor());
+        } else {
+            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        }
+
+        repaint();
     }
 
     // ------------------------
@@ -160,9 +180,11 @@ public class IOSButtonComponent extends JComponent {
 
         Graphics2D g2 = (Graphics2D) g.create();
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
-        int width = getWidth();
-        int height = getHeight();
+        int w = getWidth();
+        int h = getHeight();
 
         Color bg = getBackground();
         Color fg = getForeground();
@@ -174,26 +196,174 @@ public class IOSButtonComponent extends JComponent {
             bg = bg.darker();
         }
 
-        g2.setColor(bg);
-        int radius = (cornerRadius <= 0) ? height : cornerRadius;
-        g2.fillRoundRect(0, 0, width, height, radius, radius);
+        int radius = (cornerRadius <= 0) ? h : cornerRadius;
 
-        if (isFocusOwner()) {
-            g2.setColor(new Color(0, 120, 215));
-            g2.setStroke(new BasicStroke(1f));
-            g2.drawRoundRect(1, 1, width - 2, height - 2, radius, radius);
+        float half = strokeWidth / 2f;
+
+        Shape buttonShape = new RoundRectangle2D.Float(
+                half,
+                half,
+                w - strokeWidth,
+                h - strokeWidth,
+                radius,
+                radius
+        );
+        g2.setColor(bg);
+        g2.fill(buttonShape);
+
+        if (strokeWidth > 0f) {
+
+            Color borderColor = strokeColor != null ? strokeColor : getForeground();
+
+            if (!isEnabled()) {
+                borderColor = new Color(
+                        borderColor.getRed(),
+                        borderColor.getGreen(),
+                        borderColor.getBlue(),
+                        120
+                );
+            }
+
+            g2.setStroke(new BasicStroke(strokeWidth));
+            g2.setColor(borderColor);
+            g2.draw(buttonShape);
         }
 
-        g2.setColor(fg);
-        g2.setFont(getFont());
 
-        FontMetrics fm = g2.getFontMetrics();
-        int textWidth = fm.stringWidth(text);
-        int textX = (width - textWidth) / 2;
-        int textY = (height - fm.getHeight()) / 2 + fm.getAscent();
+        drawCenteredText(g2, new Rectangle(0, 0, w, h), fg);
 
-        g2.drawString(text, textX, textY);
+        Rectangle iconRect = calculateIconRect(g2);
+        if (iconRect != null) {
+            paintIcon(g2, iconRect, isEnabled());
+        }
 
         g2.dispose();
+    }
+
+    // ------------------------
+    // Layout helpers
+    // ------------------------
+
+    private Rectangle calculateIconRect(Graphics2D g2) {
+        Image icon = loadIconImage();
+        if (icon == null) {
+            return null;
+        }
+
+        int w = getWidth();
+        int h = getHeight();
+
+        int padding = Math.max(10, h / 4);
+        int size = (iconSize > 0) ? iconSize : Math.max(12, (int) (h * 0.45f));
+        size = Math.min(size, Math.max(8, h - 6));
+
+        FontMetrics fm = g2.getFontMetrics(getFont());
+        String safeText = text != null ? text : "";
+        int textWidth = fm.stringWidth(safeText);
+
+        int centerX = w / 2;
+        int textLeft = centerX - (textWidth / 2);
+        int textRight = centerX + (textWidth / 2);
+
+        int iconY = (h - size) / 2;
+        int iconX;
+
+        if (iconLocation == ICON_RIGHT) {
+            iconX = textRight + iconGap;
+            int maxX = w - padding - size;
+            if (iconX > maxX) {
+                iconX = maxX;
+            }
+        } else {
+            iconX = textLeft - iconGap - size;
+            int minX = padding;
+            if (iconX < minX) {
+                iconX = minX;
+            }
+        }
+
+        return new Rectangle(iconX, iconY, size, size);
+    }
+
+    // ------------------------
+    // Drawing helpers
+    // ------------------------
+
+    public Color getStrokeColor() {
+        return strokeColor;
+    }
+
+    public void setStrokeColor(Color strokeColor) {
+        Color old = this.strokeColor;
+        this.strokeColor = strokeColor;
+        firePropertyChange("strokeColor", old, strokeColor);
+        repaint();
+    }
+
+    public float getStrokeWidth() {
+        return strokeWidth;
+    }
+
+    public void setStrokeWidth(float strokeWidth) {
+        float old = this.strokeWidth;
+        this.strokeWidth = Math.max(0f, strokeWidth);
+        firePropertyChange("strokeWidth", old, this.strokeWidth);
+        repaint();
+    }
+
+    private void drawCenteredText(Graphics2D g2, Rectangle rect, Color textColor) {
+        g2.setFont(getFont());
+        g2.setColor(textColor);
+
+        FontMetrics fm = g2.getFontMetrics();
+        String safeText = text != null ? text : "";
+
+        int textWidth = fm.stringWidth(safeText);
+        int x = rect.x + (rect.width - textWidth) / 2;
+        int y = rect.y + ((rect.height - fm.getHeight()) / 2) + fm.getAscent();
+
+        g2.drawString(safeText, x, y);
+    }
+
+    private Image loadIconImage() {
+        if (iconPath == null || iconPath.trim().isEmpty()) {
+            return null;
+        }
+
+        try {
+            return ImageLoader.getInstance().loadImage(iconPath);
+        } catch (Exception ignored) {
+        }
+
+        return null;
+    }
+
+    private void paintIcon(Graphics2D g2, Rectangle rect, boolean enabled) {
+        Image img = loadIconImage();
+        if (img == null) {
+            return;
+        }
+
+        BufferedImage bi = new BufferedImage(rect.width, rect.height, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D ig = bi.createGraphics();
+        ig.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        ig.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        ig.drawImage(img, 0, 0, rect.width, rect.height, null);
+        ig.setComposite(AlphaComposite.SrcIn);
+
+        Color tint = iconColor != null ? iconColor : getForeground();
+        if (tint == null) {
+            tint = Color.WHITE;
+        }
+        if (!enabled) {
+            tint = new Color(180, 180, 180);
+        }
+
+        ig.setColor(tint);
+        ig.fillRect(0, 0, rect.width, rect.height);
+        ig.dispose();
+
+        g2.drawImage(bi, rect.x, rect.y, null);
     }
 }

@@ -17,7 +17,7 @@ public class IOSToggleSwitch extends JComponent {
     private final Color KNOB_COLOR = Color.WHITE;
 
     public IOSToggleSwitch() {
-        setPreferredSize(new Dimension(50, 28));
+        setPreferredSize(new Dimension(40, 20));
         setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         setFocusable(true);
 
@@ -173,12 +173,12 @@ public class IOSToggleSwitch extends JComponent {
 
     @Override
     public Dimension getPreferredSize() {
-        return new Dimension(50, 28);
+        return new Dimension(40, 20);
     }
 
     @Override
     public Dimension getMinimumSize() {
-        return new Dimension(40, 22);
+        return new Dimension(40, 20);
     }
 
     // ------------------------

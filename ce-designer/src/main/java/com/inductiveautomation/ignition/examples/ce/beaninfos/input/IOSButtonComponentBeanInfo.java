@@ -28,6 +28,44 @@ public class IOSButtonComponentBeanInfo extends CommonBeanInfo {
         addProp("background", "Background Color", "The button fill color.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
         addProp("font", "Font", "The font used for the button text.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
         addProp("cornerRadius", "Corner Radius", "Controls the roundness of the button corners. Use -1 for the default pill shape.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
+
+        addProp("iconPath", "Icon Path", "Ignition image path for the optional button icon. Leave empty for no icon.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
+
+        addEnumProp(
+                "iconLocation",
+                "Icon Location",
+                "Select icon placement.",
+                CAT_APPEARANCE,
+                new int[]{
+                        IOSButtonComponent.ICON_LEFT,
+                        IOSButtonComponent.ICON_RIGHT
+                },
+                new String[]{
+                        "Left",
+                        "Right"
+                }
+        );
+
+        addProp(
+                "strokeColor",
+                "Stroke Color",
+                "Border color of the button.",
+                CAT_APPEARANCE,
+                BOUND_MASK
+        );
+
+        addProp(
+                "strokeWidth",
+                "Stroke Width",
+                "Border width in pixels. Use 0 to disable the border.",
+                CAT_APPEARANCE,
+                BOUND_MASK
+        );
+
+        addProp("iconColor", "Icon Color", "Tint color applied to the icon.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
+        addProp("iconSize", "Icon Size", "Icon size in pixels. Use 0 for automatic sizing.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
+        addProp("iconGap", "Icon Gap", "Gap in pixels between the icon and the centered text.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
+
         addProp("enabled", "Enabled", "Enables or disables the button.", CAT_BEHAVIOR, PREFERRED_MASK | BOUND_MASK);
     }
 
