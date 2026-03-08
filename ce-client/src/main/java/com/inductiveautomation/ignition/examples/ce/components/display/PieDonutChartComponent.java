@@ -5,15 +5,20 @@ import com.inductiveautomation.ignition.common.Dataset;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+import java.awt.event.MouseMotionListener;
 import java.awt.geom.Arc2D;
 import java.awt.geom.Area;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Line2D;
+import java.awt.geom.Point2D;
+import java.awt.geom.Rectangle2D;
 import java.awt.geom.RoundRectangle2D;
 import java.util.ArrayList;
 import java.util.List;
 
-public class PieDonutChartComponent extends JComponent {
+public class PieDonutChartComponent extends JComponent implements MouseListener, MouseMotionListener {
 
     public static final int CHART_PIE = 0;
     public static final int CHART_DONUT = 1;
@@ -22,6 +27,10 @@ public class PieDonutChartComponent extends JComponent {
     public static final int RINGS_VERTICAL = 0;
     public static final int RINGS_HORIZONTAL = 1;
 
+    private static final int HOVER_RAISE_OFFSET = 8;
+    private static final int PRESS_RAISE_OFFSET = 12;
+    private static final int SELECT_RAISE_OFFSET = 10;
+
     private Dataset data = createDefaultDataset();
 
     private int chartType = CHART_DONUT;
@@ -29,6 +38,7 @@ public class PieDonutChartComponent extends JComponent {
     private String subtitle = "By Service Provided";
     private String units = "%";
     private int holeSize = 55;
+    private int selectedRow = -1;
 
     private boolean showLabels = true;
     private boolean showPercentages = true;
@@ -47,11 +57,19 @@ public class PieDonutChartComponent extends JComponent {
     private Font subtitleFont;
     private Font labelFont;
     private Font valueFont;
+    private Font sliceValueFont;
+    private Font sliceLabelFont;
 
     private Color titleColor;
     private Color subtitleColor;
     private Color labelColor;
     private Color valueColor;
+    private Color sliceValueColor;
+    private Color sliceLabelColor;
+
+    private int hoveredIndex = -1;
+    private int pressedIndex = -1;
+    private final List<SliceHitRegion> sliceHitRegions = new ArrayList<SliceHitRegion>();
 
     public PieDonutChartComponent() {
         setPreferredSize(new Dimension(500, 385));
@@ -61,6 +79,10 @@ public class PieDonutChartComponent extends JComponent {
         setOpaque(true);
 
         initializeStyleDefaults();
+
+        addMouseListener(this);
+        addMouseMotionListener(this);
+        ToolTipManager.sharedInstance().registerComponent(this);
     }
 
     // ------------------------
@@ -74,6 +96,9 @@ public class PieDonutChartComponent extends JComponent {
     public void setData(Dataset data) {
         Dataset old = this.data;
         this.data = (data != null) ? data : createDefaultDataset();
+        clampSelectedRow();
+        hoveredIndex = -1;
+        pressedIndex = -1;
         firePropertyChange("data", old, this.data);
         repaint();
     }
@@ -88,6 +113,8 @@ public class PieDonutChartComponent extends JComponent {
             chartType = CHART_DONUT;
         }
         this.chartType = chartType;
+        hoveredIndex = -1;
+        pressedIndex = -1;
         firePropertyChange("chartType", old, this.chartType);
         repaint();
     }
@@ -133,6 +160,24 @@ public class PieDonutChartComponent extends JComponent {
         int old = this.holeSize;
         this.holeSize = Math.max(10, Math.min(85, holeSize));
         firePropertyChange("holeSize", old, this.holeSize);
+        repaint();
+    }
+
+    public int getSelectedRow() {
+        return selectedRow;
+    }
+
+    public void setSelectedRow(int selectedRow) {
+        int old = this.selectedRow;
+        int maxIndex = (data != null) ? data.getRowCount() - 1 : -1;
+        if (selectedRow < -1) {
+            selectedRow = -1;
+        }
+        if (selectedRow > maxIndex) {
+            selectedRow = -1;
+        }
+        this.selectedRow = selectedRow;
+        firePropertyChange("selectedRow", old, this.selectedRow);
         repaint();
     }
 
@@ -293,6 +338,28 @@ public class PieDonutChartComponent extends JComponent {
         repaint();
     }
 
+    public Font getSliceValueFont() {
+        return sliceValueFont;
+    }
+
+    public void setSliceValueFont(Font sliceValueFont) {
+        Font old = this.sliceValueFont;
+        this.sliceValueFont = sliceValueFont != null ? sliceValueFont : deriveDefaultSliceValueFont();
+        firePropertyChange("sliceValueFont", old, this.sliceValueFont);
+        repaint();
+    }
+
+    public Font getSliceLabelFont() {
+        return sliceLabelFont;
+    }
+
+    public void setSliceLabelFont(Font sliceLabelFont) {
+        Font old = this.sliceLabelFont;
+        this.sliceLabelFont = sliceLabelFont != null ? sliceLabelFont : deriveDefaultSliceLabelFont();
+        firePropertyChange("sliceLabelFont", old, this.sliceLabelFont);
+        repaint();
+    }
+
     public Color getTitleColor() {
         return titleColor;
     }
@@ -337,6 +404,28 @@ public class PieDonutChartComponent extends JComponent {
         repaint();
     }
 
+    public Color getSliceValueColor() {
+        return sliceValueColor;
+    }
+
+    public void setSliceValueColor(Color sliceValueColor) {
+        Color old = this.sliceValueColor;
+        this.sliceValueColor = sliceValueColor != null ? sliceValueColor : deriveDefaultSliceValueColor();
+        firePropertyChange("sliceValueColor", old, this.sliceValueColor);
+        repaint();
+    }
+
+    public Color getSliceLabelColor() {
+        return sliceLabelColor;
+    }
+
+    public void setSliceLabelColor(Color sliceLabelColor) {
+        Color old = this.sliceLabelColor;
+        this.sliceLabelColor = sliceLabelColor != null ? sliceLabelColor : deriveDefaultSliceLabelColor();
+        firePropertyChange("sliceLabelColor", old, this.sliceLabelColor);
+        repaint();
+    }
+
     @Override
     public void setBackground(Color bg) {
         Color old = getBackground();
@@ -372,6 +461,8 @@ public class PieDonutChartComponent extends JComponent {
             g2.fill(clipShape);
         }
 
+        sliceHitRegions.clear();
+
         List<ChartRow> rows = extractRows();
 
         if (rows.isEmpty()) {
@@ -399,7 +490,7 @@ public class PieDonutChartComponent extends JComponent {
                     borderRadius
             );
         }
-        return new Rectangle.Float(
+        return new Rectangle2D.Float(
                 borderStroke / 2f,
                 borderStroke / 2f,
                 w - borderStroke,
@@ -426,7 +517,7 @@ public class PieDonutChartComponent extends JComponent {
                     borderRadius
             );
         } else {
-            borderShape = new Rectangle.Float(
+            borderShape = new Rectangle2D.Float(
                     borderStroke / 2f,
                     borderStroke / 2f,
                     w - borderStroke,
@@ -458,8 +549,9 @@ public class PieDonutChartComponent extends JComponent {
 
         Font safeTitleFont = getSafeTitleFont();
         Font safeSubtitleFont = getSafeSubtitleFont();
-        Font safeLabelFont = getSafeLabelFont();
         Font safeValueFont = getSafeValueFont();
+        Font safeSliceValueFont = getSafeSliceValueFont();
+        Font safeSliceLabelFont = getSafeSliceLabelFont();
 
         int headerHeight = 0;
 
@@ -512,15 +604,22 @@ public class PieDonutChartComponent extends JComponent {
         float hy = cy - (holeDiameter / 2f);
 
         float startAngle = 90f;
-        for (ChartRow row : rows) {
+        for (int i = 0; i < rows.size(); i++) {
+            ChartRow row = rows.get(i);
             double safeValue = Math.max(0.0, row.value);
             float extent = (float) ((safeValue / total) * 360.0);
 
+            float mid = startAngle - (extent / 2f);
+            double rad = Math.toRadians(mid);
+            int raise = getSliceRaiseOffset(i);
+            float dx = (float) (Math.cos(rad) * raise);
+            float dy = (float) (-Math.sin(rad) * raise);
+
             Shape sliceShape;
             if (chartType == CHART_DONUT) {
-                sliceShape = createDonutSlice(chartX, chartY, diameter, startAngle, -extent, hx, hy, holeDiameter);
+                sliceShape = createDonutSlice(chartX + dx, chartY + dy, diameter, startAngle, -extent, hx + dx, hy + dy, holeDiameter);
             } else {
-                sliceShape = new Arc2D.Float(chartX, chartY, diameter, diameter, startAngle, -extent, Arc2D.PIE);
+                sliceShape = new Arc2D.Float(chartX + dx, chartY + dy, diameter, diameter, startAngle, -extent, Arc2D.PIE);
             }
 
             g2.setColor(row.color);
@@ -530,16 +629,15 @@ public class PieDonutChartComponent extends JComponent {
             g2.setStroke(new BasicStroke(2f));
             g2.draw(sliceShape);
 
-            float mid = startAngle - (extent / 2f);
-            double rad = Math.toRadians(mid);
+            sliceHitRegions.add(new SliceHitRegion(i, sliceShape, row.label));
 
             if (showPercentages) {
                 String pctText = formatPercent((safeValue / total) * 100.0);
                 g2.setFont(safeValueFont);
                 FontMetrics pfm = g2.getFontMetrics();
                 float pctRadius = (chartType == CHART_DONUT) ? radius * 0.72f : radius * 0.60f;
-                float px = (float) (cx + Math.cos(rad) * pctRadius);
-                float py = (float) (cy - Math.sin(rad) * pctRadius);
+                float px = (float) (cx + dx + Math.cos(rad) * pctRadius);
+                float py = (float) (cy + dy - Math.sin(rad) * pctRadius);
 
                 g2.setColor(getSafeValueColor());
                 g2.drawString(
@@ -552,10 +650,10 @@ public class PieDonutChartComponent extends JComponent {
             if (showLabels) {
                 float lineInner = radius + 2f;
                 float lineOuter = radius + 16f;
-                float x1 = (float) (cx + Math.cos(rad) * lineInner);
-                float y1 = (float) (cy - Math.sin(rad) * lineInner);
-                float x2 = (float) (cx + Math.cos(rad) * lineOuter);
-                float y2 = (float) (cy - Math.sin(rad) * lineOuter);
+                float x1 = (float) (cx + dx + Math.cos(rad) * lineInner);
+                float y1 = (float) (cy + dy - Math.sin(rad) * lineInner);
+                float x2 = (float) (cx + dx + Math.cos(rad) * lineOuter);
+                float y2 = (float) (cy + dy - Math.sin(rad) * lineOuter);
                 float labelArm = (Math.cos(rad) >= 0) ? 14f : -14f;
                 float x3 = x2 + labelArm;
                 float y3 = y2;
@@ -567,25 +665,49 @@ public class PieDonutChartComponent extends JComponent {
 
                 String valueText = formatValue(row.value);
 
-                g2.setFont(safeLabelFont);
-                FontMetrics lfm = g2.getFontMetrics();
+                g2.setFont(safeSliceValueFont);
+                FontMetrics svfm = g2.getFontMetrics();
+
+                g2.setFont(safeSliceLabelFont);
+                FontMetrics slfm = g2.getFontMetrics();
 
                 float textX = (labelArm > 0) ? x3 + 4f : x3 - 4f;
                 float valueY = y3 - 2f;
-                float labelY = valueY + lfm.getHeight() - 2f;
+                float labelY = valueY + slfm.getHeight() - 2f;
 
-                g2.setColor(getSafeLabelColor());
+                g2.setColor(getSafeSliceValueColor());
+                g2.setFont(safeSliceValueFont);
                 if (labelArm > 0) {
                     g2.drawString(valueText, textX, valueY);
+                } else {
+                    g2.drawString(valueText, textX - svfm.stringWidth(valueText), valueY);
+                }
+
+                g2.setColor(getSafeSliceLabelColor());
+                g2.setFont(safeSliceLabelFont);
+                if (labelArm > 0) {
                     g2.drawString(row.label, textX, labelY);
                 } else {
-                    g2.drawString(valueText, textX - lfm.stringWidth(valueText), valueY);
-                    g2.drawString(row.label, textX - lfm.stringWidth(row.label), labelY);
+                    g2.drawString(row.label, textX - slfm.stringWidth(row.label), labelY);
                 }
             }
 
             startAngle -= extent;
         }
+    }
+
+    private int getSliceRaiseOffset(int index) {
+        int raise = 0;
+        if (index == selectedRow) {
+            raise = Math.max(raise, SELECT_RAISE_OFFSET);
+        }
+        if (index == hoveredIndex) {
+            raise = Math.max(raise, HOVER_RAISE_OFFSET);
+        }
+        if (index == pressedIndex) {
+            raise = Math.max(raise, PRESS_RAISE_OFFSET);
+        }
+        return raise;
     }
 
     private Shape createDonutSlice(float chartX, float chartY, float diameter,
@@ -725,8 +847,110 @@ public class PieDonutChartComponent extends JComponent {
     }
 
     // ------------------------
+    // Mouse interaction
+    // ------------------------
+
+    private int getSliceIndexAt(Point p) {
+        if (chartType == CHART_RINGS) {
+            return -1;
+        }
+        for (int i = sliceHitRegions.size() - 1; i >= 0; i--) {
+            SliceHitRegion region = sliceHitRegions.get(i);
+            if (region.shape != null && region.shape.contains(p)) {
+                return region.index;
+            }
+        }
+        return -1;
+    }
+
+    private void updateHoveredIndex(Point p) {
+        int old = hoveredIndex;
+        hoveredIndex = getSliceIndexAt(p);
+        if (old != hoveredIndex) {
+            repaint();
+        }
+    }
+
+    @Override
+    public void mouseClicked(MouseEvent e) {
+        if (chartType == CHART_RINGS) {
+            return;
+        }
+        int idx = getSliceIndexAt(e.getPoint());
+        if (idx >= 0) {
+            setSelectedRow(idx);
+        } else if (selectedRow != -1) {
+            setSelectedRow(-1);
+        }
+    }
+
+    @Override
+    public void mousePressed(MouseEvent e) {
+        if (chartType == CHART_RINGS) {
+            return;
+        }
+        int old = pressedIndex;
+        pressedIndex = getSliceIndexAt(e.getPoint());
+        if (old != pressedIndex) {
+            repaint();
+        }
+    }
+
+    @Override
+    public void mouseReleased(MouseEvent e) {
+        if (pressedIndex != -1) {
+            pressedIndex = -1;
+            repaint();
+        }
+    }
+
+    @Override
+    public void mouseEntered(MouseEvent e) {
+        updateHoveredIndex(e.getPoint());
+    }
+
+    @Override
+    public void mouseExited(MouseEvent e) {
+        if (hoveredIndex != -1 || pressedIndex != -1) {
+            hoveredIndex = -1;
+            pressedIndex = -1;
+            repaint();
+        }
+    }
+
+    @Override
+    public void mouseDragged(MouseEvent e) {
+        updateHoveredIndex(e.getPoint());
+    }
+
+    @Override
+    public void mouseMoved(MouseEvent e) {
+        updateHoveredIndex(e.getPoint());
+    }
+
+    @Override
+    public String getToolTipText(MouseEvent event) {
+        int idx = getSliceIndexAt(event.getPoint());
+        if (idx >= 0) {
+            List<ChartRow> rows = extractRows();
+            if (idx < rows.size()) {
+                ChartRow row = rows.get(idx);
+                return row.label + ": " + formatValue(row.value);
+            }
+        }
+        return null;
+    }
+
+    // ------------------------
     // Data helpers
     // ------------------------
+
+    private void clampSelectedRow() {
+        int maxIndex = (data != null) ? data.getRowCount() - 1 : -1;
+        if (selectedRow > maxIndex) {
+            selectedRow = -1;
+        }
+    }
 
     private List<ChartRow> extractRows() {
         List<ChartRow> rows = new ArrayList<ChartRow>();
@@ -862,11 +1086,15 @@ public class PieDonutChartComponent extends JComponent {
         subtitleFont = deriveDefaultSubtitleFont();
         labelFont = deriveDefaultLabelFont();
         valueFont = deriveDefaultValueFont();
+        sliceValueFont = deriveDefaultSliceValueFont();
+        sliceLabelFont = deriveDefaultSliceLabelFont();
 
         titleColor = deriveDefaultTitleColor();
         subtitleColor = deriveDefaultSubtitleColor();
         labelColor = deriveDefaultLabelColor();
         valueColor = deriveDefaultValueColor();
+        sliceValueColor = deriveDefaultSliceValueColor();
+        sliceLabelColor = deriveDefaultSliceLabelColor();
     }
 
     private Font deriveDefaultTitleFont() {
@@ -885,6 +1113,14 @@ public class PieDonutChartComponent extends JComponent {
         return new Font("Dialog", Font.BOLD, 11);
     }
 
+    private Font deriveDefaultSliceValueFont() {
+        return new Font("Dialog", Font.BOLD, 11);
+    }
+
+    private Font deriveDefaultSliceLabelFont() {
+        return new Font("Dialog", Font.PLAIN, 11);
+    }
+
     private Color deriveDefaultTitleColor() {
         return new Color(45, 45, 45);
     }
@@ -899,6 +1135,14 @@ public class PieDonutChartComponent extends JComponent {
 
     private Color deriveDefaultValueColor() {
         return Color.WHITE;
+    }
+
+    private Color deriveDefaultSliceValueColor() {
+        return new Color(45, 45, 45);
+    }
+
+    private Color deriveDefaultSliceLabelColor() {
+        return new Color(110, 110, 110);
     }
 
     private Font getSafeTitleFont() {
@@ -917,6 +1161,14 @@ public class PieDonutChartComponent extends JComponent {
         return valueFont != null ? valueFont : deriveDefaultValueFont();
     }
 
+    private Font getSafeSliceValueFont() {
+        return sliceValueFont != null ? sliceValueFont : deriveDefaultSliceValueFont();
+    }
+
+    private Font getSafeSliceLabelFont() {
+        return sliceLabelFont != null ? sliceLabelFont : deriveDefaultSliceLabelFont();
+    }
+
     private Color getSafeTitleColor() {
         return titleColor != null ? titleColor : deriveDefaultTitleColor();
     }
@@ -931,6 +1183,14 @@ public class PieDonutChartComponent extends JComponent {
 
     private Color getSafeValueColor() {
         return valueColor != null ? valueColor : deriveDefaultValueColor();
+    }
+
+    private Color getSafeSliceValueColor() {
+        return sliceValueColor != null ? sliceValueColor : deriveDefaultSliceValueColor();
+    }
+
+    private Color getSafeSliceLabelColor() {
+        return sliceLabelColor != null ? sliceLabelColor : deriveDefaultSliceLabelColor();
     }
 
     private static Dataset createDefaultDataset() {
@@ -972,6 +1232,18 @@ public class PieDonutChartComponent extends JComponent {
             this.value = value;
             this.label = label;
             this.color = color;
+        }
+    }
+
+    private static class SliceHitRegion {
+        final int index;
+        final Shape shape;
+        final String label;
+
+        SliceHitRegion(int index, Shape shape, String label) {
+            this.index = index;
+            this.shape = shape;
+            this.label = label;
         }
     }
 }
