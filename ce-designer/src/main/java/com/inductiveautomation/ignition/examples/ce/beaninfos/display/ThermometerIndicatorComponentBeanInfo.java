@@ -40,6 +40,7 @@ public class ThermometerIndicatorComponentBeanInfo extends CommonBeanInfo {
         addProp("foreground", "Foreground Color", "Text color used for tooltip and scale labels.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
         addProp("font", "Font", "Font used for scale labels.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
         addProp("background", "Background Color", "Optional component background color.", CAT_APPEARANCE, BOUND_MASK);
+        addProp("showTooltip", "Show Tooltip", "If true, the temperature tooltip is displayed.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
 
         addEnumProp(
                 "unit",

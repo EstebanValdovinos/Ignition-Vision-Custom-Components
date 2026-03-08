@@ -27,6 +27,7 @@ public class ThermometerIndicatorComponent extends JComponent {
     private float shadowOpacity = 0.15f;
     private boolean showScale = true;
     private int unit = UNIT_CELSIUS;
+    private boolean showTooltip = true;
     private double value = 65.0;
 
     public ThermometerIndicatorComponent() {
@@ -173,6 +174,20 @@ public class ThermometerIndicatorComponent extends JComponent {
         repaint();
     }
 
+    public boolean isShowTooltip() {
+        return showTooltip;
+    }
+
+    public void setShowTooltip(boolean showTooltip) {
+        boolean old = this.showTooltip;
+        if (old == showTooltip) {
+            return;
+        }
+        this.showTooltip = showTooltip;
+        firePropertyChange("showTooltip", old, this.showTooltip);
+        repaint();
+    }
+
     public boolean isShowScale() {
         return showScale;
     }
@@ -303,7 +318,9 @@ public class ThermometerIndicatorComponent extends JComponent {
             paintScale(g2, centerX, tubeW, scaleTop, scaleBottom, scaleH, actualMin, actualMax);
         }
 
-        paintTooltip(g2, centerX, tubeW, liquidTopY, scaleTop, scaleBottom, currentVal);
+        if (showTooltip) {
+            paintTooltip(g2, centerX, tubeW, liquidTopY, scaleTop, scaleBottom, currentVal);
+        }
 
         g2.dispose();
     }
@@ -438,6 +455,7 @@ public class ThermometerIndicatorComponent extends JComponent {
                             float scaleH,
                             double minV,
                             double maxV) {
+        Color fg = getForeground() != null ? getForeground() : new Color(80,80,80);
 
         int safeMajorTicks = Math.max(2, majorTicks);
         int safeFineTicks = Math.max(0, fineTicks);
@@ -455,21 +473,21 @@ public class ThermometerIndicatorComponent extends JComponent {
             float tickPct = (safeMajorTicks == 1) ? 0f : ((float) i / (float) (safeMajorTicks - 1));
             float tickY = scaleBottom - (tickPct * scaleH);
 
-            g2.setColor(Color.GRAY);
+            g2.setColor(fg);
             g2.setStroke(new BasicStroke(1f));
             g2.draw(new Line2D.Float(tickStartX, tickY, tickEndMajor, tickY));
 
             double tickVal = minV + (tickPct * range);
             String label = formatScaleValue(tickVal) + getUnitSuffix();
 
-            g2.setColor(new Color(80, 80, 80));
+            g2.setColor(fg);
             g2.drawString(label, tickEndMajor + 3f, tickY + (fm.getAscent() * 0.35f));
 
             if (i < safeMajorTicks - 1 && safeFineTicks > 0) {
                 float stepY = (scaleH / (safeMajorTicks - 1)) / (safeFineTicks + 1f);
                 for (int j = 1; j <= safeFineTicks; j++) {
                     float fineY = tickY - (j * stepY);
-                    g2.setColor(Color.LIGHT_GRAY);
+                    g2.setColor(fg);
                     g2.draw(new Line2D.Float(tickStartX, fineY, tickEndMinor, fineY));
                 }
             }
