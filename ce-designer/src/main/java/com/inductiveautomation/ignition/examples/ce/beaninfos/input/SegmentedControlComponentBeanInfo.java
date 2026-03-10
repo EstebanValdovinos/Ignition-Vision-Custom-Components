@@ -33,7 +33,6 @@ public class SegmentedControlComponentBeanInfo extends CommonBeanInfo {
         addProp("enabled", "Enabled", "Enables or disables the control.", CAT_BEHAVIOR, PREFERRED_MASK | BOUND_MASK);
         addProp("animateSelection", "Animate Selection", "If true, the selected segment transitions smoothly.", CAT_BEHAVIOR, PREFERRED_MASK | BOUND_MASK);
 
-        // Common appearance properties
         addEnumProp(
                 "orientation",
                 "Orientation",
@@ -48,6 +47,22 @@ public class SegmentedControlComponentBeanInfo extends CommonBeanInfo {
                         "Vertical"
                 }
         );
+
+        addEnumProp(
+                "iconLocation",
+                "Icon Location",
+                "Controls whether the icon is placed to the left or right of the centered text.",
+                CAT_APPEARANCE,
+                new int[]{
+                        SegmentedControlComponent.ICON_LEFT,
+                        SegmentedControlComponent.ICON_RIGHT
+                },
+                new String[]{
+                        "Left",
+                        "Right"
+                }
+        );
+
         addProp("hoverBackground", "Hover Background", "Background tint shown when hovering over a segment.", CAT_APPEARANCE, BOUND_MASK);
         addProp("borderColor", "Border Color", "Border color of the control.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
         addProp("showDividers", "Show Dividers", "If true, divider lines are shown between segments.", CAT_APPEARANCE, BOUND_MASK);
@@ -57,23 +72,17 @@ public class SegmentedControlComponentBeanInfo extends CommonBeanInfo {
         addProp("segmentGap", "Segment Gap", "Gap between segments in pixels.", CAT_APPEARANCE, BOUND_MASK);
         addProp("padding", "Padding", "Inner padding of the control in pixels.", CAT_APPEARANCE, BOUND_MASK);
         addProp("iconSize", "Icon Size", "Icon size in pixels.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
-        addProp("iconGap", "Icon Gap", "Gap between icon and text when both are present.", CAT_APPEARANCE, BOUND_MASK);
+        addProp("iconGap", "Icon Gap", "Gap between icon and centered text. Use -1 to place the icon at the segment edge.", CAT_APPEARANCE, BOUND_MASK);
 
-
-        // Unselected appearance properties
         addProp("font", "Font", "Font used for unselected segment text.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
         addProp("background", "Background Color", "Background color of the control.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
         addProp("foreground", "Foreground Color", "Text color of unselected segments.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
         addProp("iconColor", "Icon Color", "Tint color used for unselected icons.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
 
-        // Selected appearance properties
         addProp("selectedFont", "Selected Font", "Font used for selected segment text.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
         addProp("selectedBackground", "Selected Background", "Fill color of the selected segment.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
         addProp("selectedForeground", "Selected Foreground", "Text color of the selected segment.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
         addProp("selectedIconColor", "Selected Icon Color", "Tint color used for selected icons.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
-
-
-
     }
 
     @Override

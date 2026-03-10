@@ -11,6 +11,7 @@ import com.inductiveautomation.ignition.examples.ce.components.display.TeslaLoad
 import com.inductiveautomation.ignition.examples.ce.components.display.ThermometerIndicatorComponent;
 import com.inductiveautomation.ignition.examples.ce.components.display.PieDonutChartComponent;
 import com.inductiveautomation.ignition.examples.ce.components.input.SegmentedControlComponent;
+import com.inductiveautomation.ignition.examples.ce.components.input.DropdownButtonComponent;
 import com.inductiveautomation.vision.api.designer.VisionDesignerInterface;
 import com.inductiveautomation.vision.api.designer.palette.JavaBeanPaletteItem;
 import com.inductiveautomation.vision.api.designer.palette.Palette;
@@ -46,6 +47,7 @@ public class MyModuleDesignerHook extends AbstractDesignerModuleHook {
             group.addPaletteItem(new JavaBeanPaletteItem(ThermometerIndicatorComponent.class));
             group.addPaletteItem(new JavaBeanPaletteItem(PieDonutChartComponent.class));
             group.addPaletteItem(new JavaBeanPaletteItem(SegmentedControlComponent.class));
+            group.addPaletteItem(new JavaBeanPaletteItem(DropdownButtonComponent.class));
         }
     }
 }

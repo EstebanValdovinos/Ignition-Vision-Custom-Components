@@ -16,6 +16,9 @@ public class SegmentedControlComponent extends JComponent
     public static final int ORIENTATION_HORIZONTAL = 0;
     public static final int ORIENTATION_VERTICAL = 1;
 
+    public static final int ICON_LEFT = 0;
+    public static final int ICON_RIGHT = 1;
+
     private Dataset items = createDefaultDataset();
     private int selectedIndex = 0;
     private int orientation = ORIENTATION_HORIZONTAL;
@@ -38,6 +41,7 @@ public class SegmentedControlComponent extends JComponent
     private int padding = 2;
     private int iconSize = 14;
     private int iconGap = 6;
+    private int iconLocation = ICON_LEFT;
 
     private boolean showDividers = true;
     private boolean animateSelection = true;
@@ -275,8 +279,19 @@ public class SegmentedControlComponent extends JComponent
 
     public void setIconGap(int iconGap) {
         int old = this.iconGap;
-        this.iconGap = Math.max(0, iconGap);
+        this.iconGap = Math.max(-1, iconGap);
         firePropertyChange("iconGap", old, this.iconGap);
+        repaint();
+    }
+
+    public int getIconLocation() {
+        return iconLocation;
+    }
+
+    public void setIconLocation(int iconLocation) {
+        int old = this.iconLocation;
+        this.iconLocation = (iconLocation == ICON_RIGHT) ? ICON_RIGHT : ICON_LEFT;
+        firePropertyChange("iconLocation", old, this.iconLocation);
         repaint();
     }
 
@@ -706,18 +721,39 @@ public class SegmentedControlComponent extends JComponent
 
         if (hasIcon && hasText) {
             int textW = fm.stringWidth(text);
-            int totalW = iconSize + iconGap + textW;
-            int startX = r.x + ((r.width - totalW) / 2);
-            int centerY = r.y + (r.height / 2);
+            int textX = r.x + ((r.width - textW) / 2);
+            int textY = r.y + ((r.height - fm.getHeight()) / 2) + fm.getAscent();
 
-            int ix = startX;
-            int iy = centerY - (iconSize / 2);
-            paintTintedIcon(g2, icon, ix, iy, iconSize, iconTint);
+            int edgePadding = Math.max(4, padding + 4);
+            int iconY = r.y + ((r.height - iconSize) / 2);
+            int iconX;
+
+            if (iconGap == -1) {
+                if (iconLocation == ICON_RIGHT) {
+                    iconX = r.x + r.width - edgePadding - iconSize;
+                } else {
+                    iconX = r.x + edgePadding;
+                }
+            } else {
+                if (iconLocation == ICON_RIGHT) {
+                    iconX = textX + textW + iconGap;
+                    int maxX = r.x + r.width - edgePadding - iconSize;
+                    if (iconX > maxX) {
+                        iconX = maxX;
+                    }
+                } else {
+                    iconX = textX - iconGap - iconSize;
+                    int minX = r.x + edgePadding;
+                    if (iconX < minX) {
+                        iconX = minX;
+                    }
+                }
+            }
+
+            paintTintedIcon(g2, icon, iconX, iconY, iconSize, iconTint);
 
             g2.setColor(textColor);
-            int tx = startX + iconSize + iconGap;
-            int ty = r.y + ((r.height - fm.getHeight()) / 2) + fm.getAscent();
-            g2.drawString(text, tx, ty);
+            g2.drawString(text, textX, textY);
             return;
         }
 
