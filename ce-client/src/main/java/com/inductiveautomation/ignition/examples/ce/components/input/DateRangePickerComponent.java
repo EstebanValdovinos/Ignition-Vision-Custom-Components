@@ -481,7 +481,7 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
         private void paintPresets(Graphics2D g2, int x, int y, int w, int h, Theme t) {
             presetRects.clear();
 
-            Font normal = getFont().deriveFont(Font.PLAIN, 13f);
+            Font normal = getFont().deriveFont(Font.PLAIN, 11f);
             Font hoverFont = normal.deriveFont(Font.BOLD);
 
             int rowH = 34;
