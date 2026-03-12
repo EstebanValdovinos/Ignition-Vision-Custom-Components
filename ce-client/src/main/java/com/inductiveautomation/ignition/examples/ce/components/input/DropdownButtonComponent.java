@@ -16,7 +16,7 @@ import java.awt.geom.RoundRectangle2D;
 import java.awt.image.BufferedImage;
 
 public class DropdownButtonComponent extends JComponent
-        implements MouseListener, MouseMotionListener, KeyListener, FocusListener {
+        implements MouseListener, MouseMotionListener, KeyListener {
 
     public static final int ICON_LEFT = 0;
     public static final int ICON_RIGHT = 1;
@@ -77,39 +77,16 @@ public class DropdownButtonComponent extends JComponent
     // ---------------------------------
     private JPopupMenu popupMenu;
     private PopupListPanel popupPanel;
-    private boolean suppressPopupCloseCallback = false;
+    private long lastToggleTime = 0L;
 
     public DropdownButtonComponent() {
-        // Initialize popup pieces FIRST so overridden setters won't trip on nulls.
         popupPanel = new PopupListPanel();
+
         popupMenu = new JPopupMenu();
-        popupMenu.setBorder(BorderFactory.createEmptyBorder());
         popupMenu.setOpaque(false);
-        popupMenu.setFocusable(false);
-        popupMenu.add(popupPanel);
-
-        popupMenu.addPopupMenuListener(new PopupMenuListener() {
-            @Override
-            public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
-                setOpenInternal(true, false);
-            }
-
-            @Override
-            public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {
-                if (suppressPopupCloseCallback) {
-                    return;
-                }
-                setOpenInternal(false, false);
-            }
-
-            @Override
-            public void popupMenuCanceled(PopupMenuEvent e) {
-                if (suppressPopupCloseCallback) {
-                    return;
-                }
-                setOpenInternal(false, false);
-            }
-        });
+        popupMenu.setBorder(BorderFactory.createEmptyBorder());
+        popupMenu.setLayout(new BorderLayout());
+        popupMenu.add(popupPanel, BorderLayout.CENTER);
 
         setPreferredSize(new Dimension(240, headerHeight));
         setMinimumSize(new Dimension(140, headerHeight));
@@ -125,7 +102,6 @@ public class DropdownButtonComponent extends JComponent
         addMouseListener(this);
         addMouseMotionListener(this);
         addKeyListener(this);
-        addFocusListener(this);
     }
 
     private void refreshPopupPanel() {
@@ -156,7 +132,7 @@ public class DropdownButtonComponent extends JComponent
     }
 
     // ---------------------------------
-    // iOS-style header properties
+    // Properties
     // ---------------------------------
 
     public String getText() {
@@ -261,10 +237,6 @@ public class DropdownButtonComponent extends JComponent
         refreshPopupPanel();
     }
 
-    // ---------------------------------
-    // Dropdown properties
-    // ---------------------------------
-
     public Dataset getData() {
         return data;
     }
@@ -331,11 +303,10 @@ public class DropdownButtonComponent extends JComponent
     }
 
     public void setOpen(boolean open) {
-        if (open) {
-            showPopupMenu();
-        } else {
-            hidePopupMenu();
-        }
+        boolean old = this.open;
+        this.open = open;
+        firePropertyChange("open", old, this.open);
+        repaint();
     }
 
     public int getHeaderHeight() {
@@ -452,8 +423,8 @@ public class DropdownButtonComponent extends JComponent
     public void setSelectedItemIconPath(String selectedItemIconPath) {
         String old = this.selectedItemIconPath;
         this.selectedItemIconPath = (selectedItemIconPath != null) ? selectedItemIconPath : "";
-        firePropertyChange("selectedItemIconPath", old, this.selectedItemIconPath);
         refreshPopupPanel();
+        firePropertyChange("selectedItemIconPath", old, this.selectedItemIconPath);
     }
 
     public Color getSelectedItemIconColor() {
@@ -463,8 +434,8 @@ public class DropdownButtonComponent extends JComponent
     public void setSelectedItemIconColor(Color selectedItemIconColor) {
         Color old = this.selectedItemIconColor;
         this.selectedItemIconColor = (selectedItemIconColor != null) ? selectedItemIconColor : new Color(13, 110, 253);
-        firePropertyChange("selectedItemIconColor", old, this.selectedItemIconColor);
         refreshPopupPanel();
+        firePropertyChange("selectedItemIconColor", old, this.selectedItemIconColor);
     }
 
     public int getSelectedItemIconPosition() {
@@ -474,8 +445,8 @@ public class DropdownButtonComponent extends JComponent
     public void setSelectedItemIconPosition(int selectedItemIconPosition) {
         int old = this.selectedItemIconPosition;
         this.selectedItemIconPosition = (selectedItemIconPosition == ICON_RIGHT) ? ICON_RIGHT : ICON_LEFT;
-        firePropertyChange("selectedItemIconPosition", old, this.selectedItemIconPosition);
         refreshPopupPanel();
+        firePropertyChange("selectedItemIconPosition", old, this.selectedItemIconPosition);
     }
 
     public int getItemIconPosition() {
@@ -485,8 +456,8 @@ public class DropdownButtonComponent extends JComponent
     public void setItemIconPosition(int itemIconPosition) {
         int old = this.itemIconPosition;
         this.itemIconPosition = (itemIconPosition == ICON_LEFT) ? ICON_LEFT : ICON_RIGHT;
-        firePropertyChange("itemIconPosition", old, this.itemIconPosition);
         refreshPopupPanel();
+        firePropertyChange("itemIconPosition", old, this.itemIconPosition);
     }
 
     public int getItemIconSize() {
@@ -496,8 +467,8 @@ public class DropdownButtonComponent extends JComponent
     public void setItemIconSize(int itemIconSize) {
         int old = this.itemIconSize;
         this.itemIconSize = Math.max(8, itemIconSize);
-        firePropertyChange("itemIconSize", old, this.itemIconSize);
         refreshPopupPanel();
+        firePropertyChange("itemIconSize", old, this.itemIconSize);
     }
 
     public boolean isShowTopNotch() {
@@ -507,8 +478,8 @@ public class DropdownButtonComponent extends JComponent
     public void setShowTopNotch(boolean showTopNotch) {
         boolean old = this.showTopNotch;
         this.showTopNotch = showTopNotch;
-        firePropertyChange("showTopNotch", old, this.showTopNotch);
         refreshPopupPanel();
+        firePropertyChange("showTopNotch", old, this.showTopNotch);
     }
 
     public int getTopNotchWidth() {
@@ -518,8 +489,8 @@ public class DropdownButtonComponent extends JComponent
     public void setTopNotchWidth(int topNotchWidth) {
         int old = this.topNotchWidth;
         this.topNotchWidth = Math.max(6, topNotchWidth);
-        firePropertyChange("topNotchWidth", old, this.topNotchWidth);
         refreshPopupPanel();
+        firePropertyChange("topNotchWidth", old, this.topNotchWidth);
     }
 
     public int getTopNotchHeight() {
@@ -529,16 +500,16 @@ public class DropdownButtonComponent extends JComponent
     public void setTopNotchHeight(int topNotchHeight) {
         int old = this.topNotchHeight;
         this.topNotchHeight = Math.max(0, topNotchHeight);
-        firePropertyChange("topNotchHeight", old, this.topNotchHeight);
         refreshPopupPanel();
+        firePropertyChange("topNotchHeight", old, this.topNotchHeight);
     }
 
     @Override
     public void setFont(Font font) {
         Font old = getFont();
         super.setFont(font);
-        firePropertyChange("font", old, font);
         refreshPopupPanel();
+        firePropertyChange("font", old, font);
         repaint();
     }
 
@@ -550,7 +521,9 @@ public class DropdownButtonComponent extends JComponent
 
         if (!enabled) {
             pressed = false;
-            hidePopupMenu();
+            if (popupMenu != null && popupMenu.isVisible()) {
+                popupMenu.setVisible(false);
+            }
             setCursor(Cursor.getDefaultCursor());
         } else {
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -656,68 +629,90 @@ public class DropdownButtonComponent extends JComponent
     // Popup helpers
     // ---------------------------------
 
-    private void showPopupMenu() {
+    private void openPopup() {
         if (!isEnabled() || popupMenu == null || popupPanel == null) {
             return;
         }
 
-        requestFocusInWindow();
         popupPanel.revalidate();
         popupPanel.repaint();
 
-        if (popupMenu.isVisible()) {
-            popupMenu.setVisible(false);
+        Dimension popupSize = popupPanel.getPreferredSize();
+        int popupW = popupSize.width;
+        int popupH = popupSize.height;
+
+        int x = 0;
+        int y = getHeight() + 5;
+
+        try {
+            Point screenPt = getLocationOnScreen();
+            Rectangle screenBounds = getScreenBoundsFor(screenPt);
+
+            int spaceBelow = screenBounds.y + screenBounds.height - (screenPt.y + getHeight());
+            int spaceAbove = screenPt.y - screenBounds.y;
+
+            if (spaceBelow < popupH + 8 && spaceAbove > popupH + 8) {
+                y = -popupH - 2;
+            }
+
+            int desiredRight = screenPt.x + popupW;
+            int screenRight = screenBounds.x + screenBounds.width;
+            if (desiredRight > screenRight) {
+                x -= (desiredRight - screenRight) + 4;
+            }
+
+            int desiredLeft = screenPt.x + x;
+            if (desiredLeft < screenBounds.x) {
+                x += (screenBounds.x - desiredLeft) + 4;
+            }
+        } catch (IllegalComponentStateException ignored) {
         }
 
-        tryBringToFront();
+        popupMenu.show(this, x, y);
+        setOpen(true);
 
-        int y = headerHeight + 5;
-        popupMenu.show(this, 0, y);
-        setOpenInternal(true, true);
+        popupMenu.addPopupMenuListener(new PopupMenuListener() {
+            @Override
+            public void popupMenuWillBecomeVisible(PopupMenuEvent e) { }
+
+            @Override
+            public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {
+                setOpen(false);
+                setHoverIndex(-1);
+                lastToggleTime = System.currentTimeMillis();
+                popupMenu.removePopupMenuListener(this);
+            }
+
+            @Override
+            public void popupMenuCanceled(PopupMenuEvent e) {
+                setOpen(false);
+                setHoverIndex(-1);
+                lastToggleTime = System.currentTimeMillis();
+                popupMenu.removePopupMenuListener(this);
+            }
+        });
     }
 
-    private void hidePopupMenu() {
-        if (popupMenu != null && popupMenu.isVisible()) {
-            suppressPopupCloseCallback = true;
-            try {
-                popupMenu.setVisible(false);
-            } finally {
-                suppressPopupCloseCallback = false;
-            }
-        }
-        setOpenInternal(false, true);
-    }
+    private Rectangle getScreenBoundsFor(Point pointOnScreen) {
+        GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
+        GraphicsDevice[] devices = ge.getScreenDevices();
 
-    private void setOpenInternal(boolean value, boolean fire) {
-        boolean old = this.open;
-        this.open = value;
-
-        if (!value) {
-            pressed = false;
-            if (hoverIndex != -1) {
-                int oldHover = hoverIndex;
-                hoverIndex = -1;
-                firePropertyChange("hoverIndex", oldHover, -1);
+        for (GraphicsDevice device : devices) {
+            GraphicsConfiguration gc = device.getDefaultConfiguration();
+            Rectangle bounds = gc.getBounds();
+            if (bounds.contains(pointOnScreen)) {
+                Insets insets = Toolkit.getDefaultToolkit().getScreenInsets(gc);
+                return new Rectangle(
+                        bounds.x + insets.left,
+                        bounds.y + insets.top,
+                        bounds.width - insets.left - insets.right,
+                        bounds.height - insets.top - insets.bottom
+                );
             }
         }
 
-        if (fire && old != value) {
-            firePropertyChange("open", old, value);
-        }
-
-        repaint();
-        refreshPopupPanel();
-    }
-
-    private void tryBringToFront() {
-        Container parent = getParent();
-        if (parent != null) {
-            try {
-                parent.setComponentZOrder(this, 0);
-                parent.repaint();
-            } catch (Exception ignored) {
-            }
-        }
+        Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
+        return new Rectangle(0, 0, screen.width, screen.height);
     }
 
     // ---------------------------------
@@ -849,10 +844,11 @@ public class DropdownButtonComponent extends JComponent
     // Popup list panel
     // ---------------------------------
 
-    private class PopupListPanel extends JComponent implements MouseListener, MouseMotionListener {
+    private class PopupListPanel extends JPanel implements MouseListener, MouseMotionListener {
 
         PopupListPanel() {
             setOpaque(false);
+            setBorder(null);
             addMouseListener(this);
             addMouseMotionListener(this);
         }
@@ -1050,7 +1046,7 @@ public class DropdownButtonComponent extends JComponent
             int row = rowAt(e.getPoint());
             if (isSelectableRow(row)) {
                 setSelectedIndex(row);
-                hidePopupMenu();
+                popupMenu.setVisible(false);
             }
         }
 
@@ -1119,25 +1115,34 @@ public class DropdownButtonComponent extends JComponent
     // ---------------------------------
 
     @Override
-    public void mouseClicked(MouseEvent e) {
-        if (!isEnabled() || !SwingUtilities.isLeftMouseButton(e)) {
+    public void mousePressed(MouseEvent e) {
+        if (!isEnabled()) {
             return;
         }
 
-        if (e.getY() < headerHeight) {
-            requestFocusInWindow();
-            setOpen(!open);
-            firePropertyChange("buttonClicked", false, true);
+        long now = System.currentTimeMillis();
+        if (now - lastToggleTime < 150) {
+            return;
+        }
+
+        if (e.getY() >= headerHeight) {
+            return;
+        }
+
+        pressed = true;
+        repaint();
+
+        if (popupMenu.isVisible()) {
+            popupMenu.setVisible(false);
+            lastToggleTime = now;
+        } else {
+            openPopup();
+            lastToggleTime = now;
         }
     }
 
     @Override
-    public void mousePressed(MouseEvent e) {
-        if (isEnabled() && SwingUtilities.isLeftMouseButton(e) && e.getY() < headerHeight) {
-            pressed = true;
-            repaint();
-        }
-    }
+    public void mouseClicked(MouseEvent e) { }
 
     @Override
     public void mouseReleased(MouseEvent e) {
@@ -1169,24 +1174,38 @@ public class DropdownButtonComponent extends JComponent
 
         switch (e.getKeyCode()) {
             case KeyEvent.VK_SPACE:
-            case KeyEvent.VK_ENTER:
-                setOpen(!open);
+            case KeyEvent.VK_ENTER: {
+                long now = System.currentTimeMillis();
+                if (now - lastToggleTime < 150) {
+                    return;
+                }
+
+                if (popupMenu.isVisible()) {
+                    popupMenu.setVisible(false);
+                } else {
+                    openPopup();
+                }
+                lastToggleTime = now;
                 break;
+            }
 
             case KeyEvent.VK_ESCAPE:
-                hidePopupMenu();
+                if (popupMenu.isVisible()) {
+                    popupMenu.setVisible(false);
+                }
                 break;
 
             case KeyEvent.VK_DOWN:
-                if (!open) {
-                    showPopupMenu();
+                if (!popupMenu.isVisible()) {
+                    openPopup();
+                    lastToggleTime = System.currentTimeMillis();
                 } else {
                     moveSelection(1);
                 }
                 break;
 
             case KeyEvent.VK_UP:
-                if (open) {
+                if (popupMenu.isVisible()) {
                     moveSelection(-1);
                 }
                 break;
@@ -1215,16 +1234,5 @@ public class DropdownButtonComponent extends JComponent
 
         setSelectedIndex(next);
         setHoverIndex(next);
-    }
-
-    // ---------------------------------
-    // Focus
-    // ---------------------------------
-
-    @Override public void focusGained(FocusEvent e) { }
-
-    @Override
-    public void focusLost(FocusEvent e) {
-        hidePopupMenu();
     }
 }
