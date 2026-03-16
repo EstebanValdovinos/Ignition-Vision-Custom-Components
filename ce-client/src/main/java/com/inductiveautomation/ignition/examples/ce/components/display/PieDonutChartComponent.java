@@ -599,6 +599,7 @@ public class PieDonutChartComponent extends JComponent implements MouseListener,
             total = 1.0;
         }
 
+
         float holeDiameter = diameter * (holeSize / 100f);
         float hx = cx - (holeDiameter / 2f);
         float hy = cy - (holeDiameter / 2f);
