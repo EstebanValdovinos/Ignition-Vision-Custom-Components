@@ -13,6 +13,7 @@ import com.inductiveautomation.ignition.examples.ce.components.display.PieDonutC
 import com.inductiveautomation.ignition.examples.ce.components.input.SegmentedControlComponent;
 import com.inductiveautomation.ignition.examples.ce.components.input.DropdownButtonComponent;
 import com.inductiveautomation.ignition.examples.ce.components.input.DateRangePickerComponent;
+import com.inductiveautomation.ignition.examples.ce.components.input.PopupMenuButtonComponent;
 import com.inductiveautomation.vision.api.designer.VisionDesignerInterface;
 import com.inductiveautomation.vision.api.designer.palette.JavaBeanPaletteItem;
 import com.inductiveautomation.vision.api.designer.palette.Palette;
@@ -50,6 +51,7 @@ public class MyModuleDesignerHook extends AbstractDesignerModuleHook {
             group.addPaletteItem(new JavaBeanPaletteItem(SegmentedControlComponent.class));
             group.addPaletteItem(new JavaBeanPaletteItem(DropdownButtonComponent.class));
             group.addPaletteItem(new JavaBeanPaletteItem(DateRangePickerComponent.class));
+            group.addPaletteItem(new JavaBeanPaletteItem(PopupMenuButtonComponent.class));
         }
     }
 }
