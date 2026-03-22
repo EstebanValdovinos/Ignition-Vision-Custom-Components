@@ -35,7 +35,7 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
     private Color todayColor = new Color(240, 182, 7);
     private Color backgroundColor = Color.WHITE;
     private Color lineColor = new Color(213, 213, 213);
-    private Color headerColor = new Color(230, 231, 233);
+    private Color headerColor = new Color(255, 255, 255);
     private Color headerTextColor = new Color(85, 85, 85);
 
     private boolean dark = false;
@@ -49,10 +49,10 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
         setOpaque(false);
         setFocusable(true);
         setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        setFont(new Font("Dialog", Font.PLAIN, 12));
+        setFont(new Font("Dialog", Font.BOLD, 13));
         setForeground(new Color(70, 70, 70));
         setBackground(new Color(245, 245, 245));
-        setPreferredSize(new Dimension(300, 34));
+        setPreferredSize(new Dimension(335, 45));
         setMinimumSize(new Dimension(180, 28));
 
         popupMenu = new JPopupMenu();

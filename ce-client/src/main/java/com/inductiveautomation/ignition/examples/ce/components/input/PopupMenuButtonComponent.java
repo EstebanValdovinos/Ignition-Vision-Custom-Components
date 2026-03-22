@@ -30,7 +30,7 @@ public class PopupMenuButtonComponent extends JComponent implements MouseListene
     private static final int ITEM_RADIUS = 8;
     private static final int GRID_LINE_PAD = 8;
 
-    private String text = "Options";
+    private String text = "Menu";
     private Color btnColor = new Color(13, 110, 253);
     private Color btnTextColor = Color.WHITE;
     private Font buttonTextFont = new Font("SansSerif", Font.BOLD, 12);
@@ -741,7 +741,7 @@ public class PopupMenuButtonComponent extends JComponent implements MouseListene
 
     @Override
     public Dimension getPreferredSize() {
-        return new Dimension(120, 40);
+        return new Dimension(230, 40);
     }
 
     @Override

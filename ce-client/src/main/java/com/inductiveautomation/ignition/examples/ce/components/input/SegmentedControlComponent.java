@@ -23,8 +23,8 @@ public class SegmentedControlComponent extends JComponent
     private int selectedIndex = 0;
     private int orientation = ORIENTATION_HORIZONTAL;
 
-    private Color selectedBackground = Color.WHITE;
-    private Color selectedForeground = new Color(60, 60, 60);
+    private Color selectedBackground = new Color(0,123, 255); //Color.WHITE;
+    private Color selectedForeground = new Color(255, 255, 255);
     private Color selectedIconColor = new Color(60, 60, 60);
 
     private Color hoverBackground = new Color(0, 0, 0, 16);
@@ -33,12 +33,12 @@ public class SegmentedControlComponent extends JComponent
 
     private Color iconColor = new Color(105, 105, 110);
 
-    private Font selectedFont = new Font("Dialog", Font.BOLD, 12);
+    private Font selectedFont = new Font("Dialog", Font.BOLD, 13);
 
-    private float borderWidth = 1f;
-    private int cornerRadius = 10; // -1 = pill
-    private int segmentGap = 0;
-    private int padding = 2;
+    private float borderWidth = 0.5f;
+    private int cornerRadius = 15; // -1 = pill
+    private int segmentGap = 10;
+    private int padding = 5;
     private int iconSize = 14;
     private int iconGap = 6;
     private int iconLocation = ICON_LEFT;
@@ -58,12 +58,12 @@ public class SegmentedControlComponent extends JComponent
     private final Timer animationTimer;
 
     public SegmentedControlComponent() {
-        setPreferredSize(new Dimension(250, 40));
+        setPreferredSize(new Dimension(335, 45));
         setMinimumSize(new Dimension(90, 32));
 
-        setBackground(new Color(235, 235, 238));
-        setForeground(new Color(95, 95, 100));
-        setFont(new Font("Dialog", Font.BOLD, 12));
+        setBackground(new Color(255, 255, 255));
+        setForeground(new Color(43, 43, 43));
+        setFont(new Font("Dialog", Font.BOLD, 13));
 
         setFocusable(true);
         setOpaque(false);
@@ -468,12 +468,21 @@ public class SegmentedControlComponent extends JComponent
         Class<?>[] columnTypes = new Class<?>[]{String.class, String.class};
 
         Object[][] data = new Object[][]{
-                {"Calendar", ""},
-                {"Date Range", ""}
+                {
+                        "Complete",
+                        "Incomplete",
+                        "Pending"
+                },
+                {
+                        "",
+                        "",
+                        "",
+                }
         };
 
         return new BasicDataset(columnNames, columnTypes, data);
     }
+
 
     // ------------------------
     // Helpers
