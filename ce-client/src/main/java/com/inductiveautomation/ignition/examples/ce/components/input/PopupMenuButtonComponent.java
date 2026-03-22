@@ -33,7 +33,7 @@ public class PopupMenuButtonComponent extends JComponent implements MouseListene
     private String text = "Menu";
     private Color btnColor = new Color(13, 110, 253);
     private Color btnTextColor = Color.WHITE;
-    private Font buttonTextFont = new Font("SansSerif", Font.BOLD, 12);
+    private Font buttonTextFont = new Font("SansSerif", Font.BOLD, 14);
 
     private Dataset options = createDefaultOptionsDataset();
     private String selectedItem = "";

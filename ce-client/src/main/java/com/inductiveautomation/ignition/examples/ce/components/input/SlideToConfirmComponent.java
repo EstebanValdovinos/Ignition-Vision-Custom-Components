@@ -19,7 +19,7 @@ public class SlideToConfirmComponent extends JComponent {
 
     private Color knobColor = Color.WHITE;
     private Color iconColor = new Color(0, 122, 255);
-    private Color pulseColor = Color.WHITE;
+    private Color pulseColor = Color.BLACK;
 
     private int cornerRadius = -1;
     private int pulsePadding = 15;
@@ -44,9 +44,9 @@ public class SlideToConfirmComponent extends JComponent {
     private final Timer resetAnimationTimer;
 
     public SlideToConfirmComponent() {
-        setPreferredSize(new Dimension(260, 70));
+        setPreferredSize(new Dimension(310, 75));
         setMinimumSize(new Dimension(140, 40));
-        setFont(new Font("Dialog", Font.BOLD, 12));
+        setFont(new Font("Dialog", Font.BOLD, 13));
         setBackground(new Color(0, 122, 255));
         setForeground(Color.WHITE);
         setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -647,7 +647,7 @@ public class SlideToConfirmComponent extends JComponent {
 
     @Override
     public Dimension getPreferredSize() {
-        return new Dimension(260, 70);
+        return new Dimension(310, 75);
     }
 
     @Override

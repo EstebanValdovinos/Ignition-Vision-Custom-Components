@@ -48,8 +48,8 @@ public class IOSToggleSwitchBeanInfo extends CommonBeanInfo {
     @Override
     protected void initDesc() {
         VisionBeanDescriptor bean = getBeanDescriptor();
-        bean.setName("iOS Toggle");
-        bean.setDisplayName("iOS Toggle");
+        bean.setName("Toggle Switch");
+        bean.setDisplayName("Toggle Switch");
         bean.setShortDescription("An iOS-style toggle switch component.");
         // Comment out until we update the term finder
         // bean.setValue(CommonBeanInfo.TERM_FINDER_CLASS, HelloWorldComponentTermFinder.class);

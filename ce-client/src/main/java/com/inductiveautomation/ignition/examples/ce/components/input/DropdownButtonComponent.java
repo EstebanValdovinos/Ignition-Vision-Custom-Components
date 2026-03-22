@@ -52,7 +52,7 @@ public class DropdownButtonComponent extends JComponent
     private int headerHeight = 40;
     private int rowHeight = 30;
 
-    private Color headerBackground = new Color(233, 236, 239);
+    private Color headerBackground = new Color(255, 255, 255);
     private Color listBackground = Color.WHITE;
     private Color foreground = new Color(73, 80, 87);
     private Color hoverBackground = new Color(248, 249, 250);
@@ -88,13 +88,13 @@ public class DropdownButtonComponent extends JComponent
         popupMenu.setLayout(new BorderLayout());
         popupMenu.add(popupPanel, BorderLayout.CENTER);
 
-        setPreferredSize(new Dimension(240, headerHeight));
+        setPreferredSize(new Dimension(335, headerHeight));
         setMinimumSize(new Dimension(140, headerHeight));
 
         super.setForeground(this.foreground);
         super.setBackground(headerBackground);
 
-        setFont(new Font("SansSerif", Font.PLAIN, 12));
+        setFont(new Font("SansSerif", Font.PLAIN, 13));
         setFocusable(true);
         setOpaque(false);
         setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -117,18 +117,36 @@ public class DropdownButtonComponent extends JComponent
 
     private static Dataset createDefaultDataset() {
         String[] columnNames = new String[]{"label", "iconPath", "value"};
-        Class<?>[] columnTypes = new Class<?>[]{String.class, String.class, String.class};
+        Class<?>[] columnTypes = new Class<?>[]{String.class, String.class, Integer.class};
 
-        Object[][] rows = new Object[][]{
-                {"Option 1", "", "option1"},
-                {"Option 2", "Builtin/icons/16/information2.png", "option2"},
-                {"Another Option", "", "option3"},
-                {"One more Option", "", "option4"},
-                {"-", "", ""},
-                {"Separate Link", "", "option5"}
+        Object[][] data = new Object[][]{
+                {
+                        "Option 1",
+                        "Option 2",
+                        "Another Option",
+                        "One More Option",
+                        "-",
+                        "Separate Link"
+                },
+                {
+                        "",
+                        "",
+                        "",
+                        "Builtin/icons/16/lightbulb.png",
+                        "",
+                        ""
+                },
+                {
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6
+                }
         };
 
-        return new BasicDataset(columnNames, columnTypes, rows);
+        return new BasicDataset(columnNames, columnTypes, data);
     }
 
     // ---------------------------------

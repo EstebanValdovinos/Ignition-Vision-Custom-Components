@@ -912,8 +912,8 @@ public class SegmentedControlComponent extends JComponent
     @Override
     public Dimension getPreferredSize() {
         return orientation == ORIENTATION_VERTICAL
-                ? new Dimension(120, 110)
-                : new Dimension(250, 40);
+                ? new Dimension(250, 150)
+                : new Dimension(335, 45);
     }
 
     @Override

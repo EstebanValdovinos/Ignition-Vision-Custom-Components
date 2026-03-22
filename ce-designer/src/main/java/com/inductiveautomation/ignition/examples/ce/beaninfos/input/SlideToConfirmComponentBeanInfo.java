@@ -46,8 +46,8 @@ public class SlideToConfirmComponentBeanInfo extends CommonBeanInfo {
     @Override
     protected void initDesc() {
         VisionBeanDescriptor bean = getBeanDescriptor();
-        bean.setName("Slide To Confirm");
-        bean.setDisplayName("Slide To Confirm");
+        bean.setName("Sliding Button");
+        bean.setDisplayName("Sliding Button");
         bean.setShortDescription("A draggable slide button that confirms when the knob reaches the end.");
     }
 

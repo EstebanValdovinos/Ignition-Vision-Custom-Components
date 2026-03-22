@@ -24,7 +24,7 @@ import com.inductiveautomation.vision.api.designer.palette.PaletteItemGroup;
  */
 public class MyModuleDesignerHook extends AbstractDesignerModuleHook {
 
-    public static final String MODULE_ID = "component-example";
+    public static final String MODULE_ID = "custom-HMI-components-v1";
 
     @Override
     public void startup(DesignerContext context, LicenseState activationState) throws Exception {
@@ -40,7 +40,7 @@ public class MyModuleDesignerHook extends AbstractDesignerModuleHook {
         if (sdk != null) {
             Palette palette = sdk.getPalette();
 
-            PaletteItemGroup group = palette.addGroup("Custom Components");
+            PaletteItemGroup group = palette.addGroup("Custom HMI Components ");
             group.addPaletteItem(new JavaBeanPaletteItem(IOSToggleSwitch.class));
             group.addPaletteItem(new JavaBeanPaletteItem(IOSButtonComponent.class));
             group.addPaletteItem(new JavaBeanPaletteItem(StatusIndicatorComponent.class));

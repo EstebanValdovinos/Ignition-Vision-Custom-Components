@@ -72,8 +72,8 @@ public class IOSButtonComponentBeanInfo extends CommonBeanInfo {
     @Override
     protected void initDesc() {
         VisionBeanDescriptor bean = getBeanDescriptor();
-        bean.setName("iOS Button");
-        bean.setDisplayName("iOS Button");
+        bean.setName("Rounded Button");
+        bean.setDisplayName("Rounded Button");
         bean.setShortDescription("An iOS-style rounded button component.");
     }
 
