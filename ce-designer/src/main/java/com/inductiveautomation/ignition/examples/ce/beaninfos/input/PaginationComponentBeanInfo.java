@@ -34,6 +34,8 @@ public class PaginationComponentBeanInfo extends CommonBeanInfo {
         addProp("currentPage", "Current Page", "Current selected page.", CAT_DATA, PREFERRED_MASK | BOUND_MASK);
         addProp("totalPages", "Total Pages", "Total number of available pages.", CAT_DATA, PREFERRED_MASK | BOUND_MASK);
         addProp("visiblePageCount", "Visible Page Count", "Number of visible page buttons in Numbers mode.", CAT_DATA, PREFERRED_MASK | BOUND_MASK);
+        addProp("pageSize", "Page Size", "Current page size selection.", CAT_DATA, PREFERRED_MASK | BOUND_MASK);
+        addProp("pageSizeOptions", "Page Size Options", "Comma-separated page size options, for example: 10,25,50", CAT_DATA, PREFERRED_MASK | BOUND_MASK);
 
         // -----------------------------
         // Behavior
@@ -67,6 +69,27 @@ public class PaginationComponentBeanInfo extends CommonBeanInfo {
         addProp("commitOnEnter", "Commit On Enter", "Commits the typed page when Enter is pressed.", CAT_BEHAVIOR, PREFERRED_MASK | BOUND_MASK);
         addProp("commitOnFocusLost", "Commit On Focus Lost", "Commits the typed page when the input loses focus.", CAT_BEHAVIOR, PREFERRED_MASK | BOUND_MASK);
         addProp("autoClampPage", "Auto Clamp Page", "Keeps the page value inside the valid page range.", CAT_BEHAVIOR, PREFERRED_MASK | BOUND_MASK);
+        addProp("keyboardNavigationEnabled", "Keyboard Navigation Enabled", "Enables left, right, home, end, page up, and page down navigation.", CAT_BEHAVIOR, PREFERRED_MASK | BOUND_MASK);
+        addProp("showPageSizeSelector", "Show Page Size Selector", "Shows the page size selector combo box.", CAT_BEHAVIOR, PREFERRED_MASK | BOUND_MASK);
+
+        addEnumProp(
+                "animationMode",
+                "Animation Mode",
+                "Controls page change animation.",
+                CAT_BEHAVIOR,
+                new int[]{
+                        PaginationComponent.ANIMATION_NONE,
+                        PaginationComponent.ANIMATION_FADE,
+                        PaginationComponent.ANIMATION_SLIDE
+                },
+                new String[]{
+                        "None",
+                        "Fade",
+                        "Slide"
+                }
+        );
+
+        addProp("animationDurationMs", "Animation Duration", "Animation duration in milliseconds.", CAT_BEHAVIOR, PREFERRED_MASK | BOUND_MASK);
 
         addEnumProp(
                 "navLabelMode",
@@ -105,6 +128,7 @@ public class PaginationComponentBeanInfo extends CommonBeanInfo {
         addProp("buttonHeight", "Button Height", "Height of the navigation buttons.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
         addProp("inputWidth", "Input Width", "Width of the manual page input field.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
         addProp("pageButtonMinWidth", "Page Button Min Width", "Minimum width of numeric page buttons.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
+        addProp("pageSizeSelectorWidth", "Page Size Selector Width", "Width of the page size selector combo box.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
         addProp("hoverBackground", "Hover Background", "Background color for hovered buttons and pages.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
         addProp("selectedPageBackground", "Selected Page Background", "Background color for the selected page.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
         addProp("selectedPageForeground", "Selected Page Foreground", "Text color for the selected page.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
@@ -114,7 +138,6 @@ public class PaginationComponentBeanInfo extends CommonBeanInfo {
         addProp("inputBorderColor", "Input Border Color", "Border color of the page input field.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
         addProp("secondaryTextColor", "Secondary Text Color", "Color used for secondary text such as 'of 20' and ellipsis.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
         addProp("iconColor", "Navigation Color", "Color used for navigation icons and labels.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
-
         addProp("showNavButtonBorder", "Show Navigation Button Border", "Controls whether navigation buttons draw a border.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
         addProp("navButtonBorderColor", "Navigation Button Border Color", "Border color for navigation buttons.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
     }

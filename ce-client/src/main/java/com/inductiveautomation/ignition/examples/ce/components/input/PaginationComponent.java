@@ -1,6 +1,10 @@
 package com.inductiveautomation.ignition.examples.ce.components.input;
 
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import javax.swing.plaf.basic.BasicComboBoxUI;
+import javax.swing.plaf.basic.BasicComboPopup;
+import javax.swing.plaf.basic.ComboPopup;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.Path2D;
@@ -16,8 +20,14 @@ public class PaginationComponent extends JComponent {
     public static final int NAV_LABEL_MODE_TEXT_ONLY = 1;
     public static final int NAV_LABEL_MODE_ICON_AND_TEXT = 2;
 
+    public static final int ANIMATION_NONE = 0;
+    public static final int ANIMATION_FADE = 1;
+    public static final int ANIMATION_SLIDE = 2;
+
     private static final String DEFAULT_SEPARATOR = "of";
     private static final String DEFAULT_ELLIPSIS = "...";
+    private static final String PAGE_SIZE_LABEL_TEXT = "Items per page";
+    private static final int PAGE_SIZE_LABEL_GAP = 8;
 
     // -----------------------------
     // Data
@@ -26,6 +36,13 @@ public class PaginationComponent extends JComponent {
     private int currentPage = 5;
     private int totalPages = 10;
     private int visiblePageCount = 5;
+
+    // New data
+    private int pageSize = 10;
+    private String pageSizeOptions = "10,25,50";
+    private int pageChangeTrigger = 0;
+    private int pageSizeChangeTrigger = 0;
+    private String lastPageChangeSource = "init";
 
     // -----------------------------
     // Behavior
@@ -45,6 +62,12 @@ public class PaginationComponent extends JComponent {
     private boolean commitOnFocusLost = true;
     private boolean autoClampPage = true;
 
+    // New behavior
+    private boolean keyboardNavigationEnabled = true;
+    private boolean showPageSizeSelector = false;
+    private int animationMode = ANIMATION_FADE;
+    private int animationDurationMs = 180;
+
     // -----------------------------
     // Navigation label behavior
     // -----------------------------
@@ -57,13 +80,13 @@ public class PaginationComponent extends JComponent {
     // -----------------------------
     // Appearance
     // -----------------------------
-    private Color background = new Color(255,255,255,0);
+    private Color background = new Color(255, 255, 255, 0);
     private Color foreground = new Color(60, 60, 60);
     private Color borderColor = new Color(210, 210, 210);
     private int borderWidth = 0;
     private int cornerRadius = 10;
     private int padding = 6;
-    private int buttonGap = 10;
+    private int buttonGap = 5;
     private int buttonWidth = 36;
     private int buttonHeight = 32;
     private int inputWidth = 40;
@@ -76,30 +99,48 @@ public class PaginationComponent extends JComponent {
     private Color inputForeground = new Color(60, 60, 60);
     private Color inputBorderColor = new Color(190, 190, 190);
     private Color secondaryTextColor = new Color(130, 130, 130);
-    private Color iconColor = new Color(90, 150, 220);
+    private Color iconColor = new Color(100, 120, 145);
 
     // New nav button border controls
     private boolean showNavButtonBorder = false;
     private Color navButtonBorderColor = new Color(120, 185, 245);
 
+    // New appearance
+    private int pageSizeSelectorWidth = 72;
+
     private final JTextField pageField = new JTextField("1");
+    private final JComboBox<Integer> pageSizeCombo = new JComboBox<>();
     private final List<HitRegion> hitRegions = new ArrayList<>();
 
     private String hoveredKey = null;
     private String pressedKey = null;
 
+    // Animation state
+    private final Timer animationTimer;
+    private float animationProgress = 1f;
+    private int animationFromPage = -1;
+    private int animationToPage = -1;
+
     public PaginationComponent() {
         setLayout(null);
         setOpaque(false);
+        setFocusable(true);
         setFont(new Font("Dialog", Font.PLAIN, 12));
         setPreferredSize(new Dimension(620, 40));
         setMinimumSize(new Dimension(180, 36));
 
         configurePageField();
+        configurePageSizeCombo();
         installMouseHandlers();
+        installKeyboardNavigation();
+
+        animationTimer = new Timer(15, e -> stepAnimation());
+
         updatePageField();
         updateFieldVisibility();
         syncFieldStyle();
+        refreshPageSizeOptions();
+        updatePageSizeComboVisibility();
     }
 
     // -------------------------------------------------------------------------
@@ -144,6 +185,131 @@ public class PaginationComponent extends JComponent {
         add(pageField);
     }
 
+    private void configurePageSizeCombo() {
+        pageSizeCombo.setFocusable(false);
+        pageSizeCombo.setFont(getFont());
+        pageSizeCombo.setOpaque(false);
+        pageSizeCombo.setBorder(BorderFactory.createEmptyBorder());
+        pageSizeCombo.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        pageSizeCombo.putClientProperty("JComboBox.isTableCellEditor", Boolean.TRUE);
+        pageSizeCombo.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                label.setText(value != null ? String.valueOf(value) : "");
+                label.setHorizontalAlignment(SwingConstants.CENTER);
+                label.setBorder(new EmptyBorder(3, 6, 3, 6));
+                label.setFont(getFont());
+                label.setOpaque(true);
+                if (isSelected) {
+                    label.setBackground(selectedPageBackground != null ? selectedPageBackground : new Color(235, 245, 255));
+                    label.setForeground(selectedPageForeground != null ? selectedPageForeground : new Color(0, 102, 204));
+                } else {
+                    label.setBackground(Color.WHITE);
+                    label.setForeground(inputForeground != null ? inputForeground : new Color(60, 60, 60));
+                }
+                return label;
+            }
+        });
+        pageSizeCombo.setUI(new BasicComboBoxUI() {
+            @Override
+            protected JButton createArrowButton() {
+                JButton button = new JButton() {
+                    @Override
+                    public Dimension getPreferredSize() {
+                        return new Dimension(18, Math.max(18, buttonHeight));
+                    }
+
+                    @Override
+                    protected void paintComponent(Graphics g) {
+                        Graphics2D g2 = (Graphics2D) g.create();
+                        try {
+                            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                            g2.setColor(enabled ? (iconColor != null ? iconColor : new Color(100, 120, 145))
+                                    : (secondaryTextColor != null ? secondaryTextColor : new Color(130, 130, 130)));
+                            int cx = getWidth() / 2;
+                            int cy = getHeight() / 2 + 1;
+                            Path2D chevron = new Path2D.Float();
+                            chevron.moveTo(cx - 4, cy - 2);
+                            chevron.lineTo(cx, cy + 2);
+                            chevron.lineTo(cx + 4, cy - 2);
+                            g2.setStroke(new BasicStroke(1.8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                            g2.draw(chevron);
+                        } finally {
+                            g2.dispose();
+                        }
+                    }
+                };
+                button.setBorder(BorderFactory.createEmptyBorder());
+                button.setContentAreaFilled(false);
+                button.setFocusPainted(false);
+                button.setFocusable(false);
+                button.setOpaque(false);
+                button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                return button;
+            }
+
+            @Override
+            public void paintCurrentValueBackground(Graphics g, Rectangle bounds, boolean hasFocus) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                try {
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                    Color fill = inputBackground != null ? inputBackground : Color.WHITE;
+                    Color stroke = showNavButtonBorder
+                            ? (navButtonBorderColor != null ? navButtonBorderColor : new Color(120, 185, 245))
+                            : (inputBorderColor != null ? inputBorderColor : new Color(190, 190, 190));
+
+                    if (hasFocus && !showNavButtonBorder) {
+                        stroke = new Color(170, 210, 255);
+                    }
+
+                    if (!enabled) {
+                        fill = new Color(fill.getRed(), fill.getGreen(), fill.getBlue(), 180);
+                        stroke = secondaryTextColor != null ? secondaryTextColor : new Color(130, 130, 130);
+                    }
+
+                    g2.setColor(fill);
+                    g2.fillRoundRect(bounds.x, bounds.y, bounds.width - 1, bounds.height - 1, getButtonArc(), getButtonArc());
+
+                    if (showNavButtonBorder || hasFocus || inputBorderColor != null) {
+                        g2.setColor(stroke);
+                        g2.setStroke(new BasicStroke(1f));
+                        g2.drawRoundRect(bounds.x, bounds.y, bounds.width - 1, bounds.height - 1, getButtonArc(), getButtonArc());
+                    }
+                } finally {
+                    g2.dispose();
+                }
+            }
+
+            @Override
+            protected ComboPopup createPopup() {
+                BasicComboPopup popup = new BasicComboPopup(comboBox) {
+                    @Override
+                    protected JScrollPane createScroller() {
+                        JScrollPane scroller = super.createScroller();
+                        scroller.setBorder(BorderFactory.createLineBorder(
+                                inputBorderColor != null ? inputBorderColor : new Color(190, 190, 190)
+                        ));
+                        return scroller;
+                    }
+                };
+                popup.setBorder(BorderFactory.createEmptyBorder());
+                return popup;
+            }
+        });
+        pageSizeCombo.addActionListener(e -> {
+            if (!pageSizeCombo.isShowing()) {
+                return;
+            }
+            Object selected = pageSizeCombo.getSelectedItem();
+            if (selected instanceof Integer) {
+                setPageSize(((Integer) selected).intValue(), "pageSizeSelector");
+            }
+        });
+        add(pageSizeCombo);
+    }
+
     private void installMouseHandlers() {
         MouseAdapter mouseAdapter = new MouseAdapter() {
 
@@ -182,6 +348,8 @@ public class PaginationComponent extends JComponent {
 
             @Override
             public void mousePressed(MouseEvent e) {
+                requestFocusInWindow();
+
                 if (!enabled || !SwingUtilities.isLeftMouseButton(e)) {
                     return;
                 }
@@ -214,6 +382,71 @@ public class PaginationComponent extends JComponent {
         addMouseMotionListener(mouseAdapter);
     }
 
+    private void installKeyboardNavigation() {
+        InputMap im = getInputMap(WHEN_FOCUSED);
+        ActionMap am = getActionMap();
+
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_LEFT, 0), "page-left");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, 0), "page-right");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_HOME, 0), "page-home");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_END, 0), "page-end");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_PAGE_UP, 0), "page-up");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_PAGE_DOWN, 0), "page-down");
+
+        am.put("page-left", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (canProcessKeyboardNavigation()) {
+                    setCurrentPageInternal(currentPage - 1, "keyboardLeft");
+                }
+            }
+        });
+        am.put("page-right", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (canProcessKeyboardNavigation()) {
+                    setCurrentPageInternal(currentPage + 1, "keyboardRight");
+                }
+            }
+        });
+        am.put("page-home", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (canProcessKeyboardNavigation()) {
+                    setCurrentPageInternal(1, "keyboardHome");
+                }
+            }
+        });
+        am.put("page-end", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (canProcessKeyboardNavigation()) {
+                    setCurrentPageInternal(totalPages, "keyboardEnd");
+                }
+            }
+        });
+        am.put("page-up", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (canProcessKeyboardNavigation()) {
+                    setCurrentPageInternal(currentPage - Math.max(1, visiblePageCount), "keyboardPageUp");
+                }
+            }
+        });
+        am.put("page-down", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (canProcessKeyboardNavigation()) {
+                    setCurrentPageInternal(currentPage + Math.max(1, visiblePageCount), "keyboardPageDown");
+                }
+            }
+        });
+    }
+
+    private boolean canProcessKeyboardNavigation() {
+        return enabled && keyboardNavigationEnabled && !pageField.hasFocus();
+    }
+
     private boolean equalsNullable(String a, String b) {
         return a == null ? b == null : a.equals(b);
     }
@@ -224,6 +457,53 @@ public class PaginationComponent extends JComponent {
         pageField.setCaretColor(inputForeground);
         pageField.setEnabled(enabled && editablePageInput);
         pageField.setFocusable(enabled && editablePageInput);
+
+        pageSizeCombo.setFont(getFont());
+        pageSizeCombo.setForeground(inputForeground);
+        pageSizeCombo.setEnabled(enabled);
+        pageSizeCombo.repaint();
+    }
+
+    private void refreshPageSizeOptions() {
+        List<Integer> options = parsePageSizeOptions(pageSizeOptions);
+        if (options.isEmpty()) {
+            options.add(Integer.valueOf(pageSize));
+        }
+
+        DefaultComboBoxModel<Integer> model = new DefaultComboBoxModel<>();
+        boolean pageSizeIncluded = false;
+        for (Integer option : options) {
+            model.addElement(option);
+            if (option != null && option.intValue() == pageSize) {
+                pageSizeIncluded = true;
+            }
+        }
+        if (!pageSizeIncluded) {
+            model.addElement(Integer.valueOf(pageSize));
+        }
+
+        pageSizeCombo.setModel(model);
+        pageSizeCombo.setSelectedItem(Integer.valueOf(pageSize));
+    }
+
+    private List<Integer> parsePageSizeOptions(String raw) {
+        List<Integer> options = new ArrayList<>();
+        if (raw == null || raw.trim().isEmpty()) {
+            return options;
+        }
+
+        String[] parts = raw.split(",");
+        for (String part : parts) {
+            try {
+                int value = Integer.parseInt(part.trim());
+                if (value > 0 && !options.contains(Integer.valueOf(value))) {
+                    options.add(Integer.valueOf(value));
+                }
+            } catch (Exception ignored) {
+                // Ignore invalid option
+            }
+        }
+        return options;
     }
 
     // -------------------------------------------------------------------------
@@ -234,11 +514,12 @@ public class PaginationComponent extends JComponent {
     public void doLayout() {
         super.doLayout();
 
+        FontMetrics fm = getFontMetrics(getFont());
+
         if (type == TYPE_INPUT && showPageInput) {
             int fieldH = getFieldHeight();
             int fieldY = (getHeight() - fieldH) / 2;
 
-            FontMetrics fm = getFontMetrics(getFont());
             int contentW = measureInputModeWidth(fm);
             int startX = getCenteredStartX(contentW);
 
@@ -252,6 +533,14 @@ public class PaginationComponent extends JComponent {
             pageField.setBounds(startX, fieldY, inputWidth, fieldH);
         } else {
             pageField.setBounds(0, 0, 0, 0);
+        }
+
+        if (showPageSizeSelector) {
+            int selectorX = getWidth() - padding - getPageSizeSelectorGroupWidth(fm);
+            int selectorY = (getHeight() - buttonHeight) / 2;
+            pageSizeCombo.setBounds(selectorX, selectorY, pageSizeSelectorWidth, buttonHeight);
+        } else {
+            pageSizeCombo.setBounds(0, 0, 0, 0);
         }
     }
 
@@ -269,10 +558,30 @@ public class PaginationComponent extends JComponent {
         return Math.min(12, Math.max(6, buttonHeight));
     }
 
+    private int getPageSizeSelectorGroupWidth(FontMetrics fm) {
+        if (!showPageSizeSelector) {
+            return 0;
+        }
+        return pageSizeSelectorWidth + PAGE_SIZE_LABEL_GAP + fm.stringWidth(PAGE_SIZE_LABEL_TEXT);
+    }
+
+    private void paintPageSizeSelectorLabel(Graphics2D g2, int x, FontMetrics fm) {
+        if (!showPageSizeSelector) {
+            return;
+        }
+        g2.setFont(getFont());
+        g2.setColor(secondaryTextColor != null ? secondaryTextColor : new Color(130, 130, 130));
+        int ty = (getHeight() + fm.getAscent() - fm.getDescent()) / 2;
+        g2.drawString(PAGE_SIZE_LABEL_TEXT, x + pageSizeSelectorWidth + PAGE_SIZE_LABEL_GAP, ty);
+    }
+
     private int measureInputModeWidth(FontMetrics fm) {
         int width = 0;
 
-        if (showFirstButton) width += measureNavButtonWidth(fm, "first");
+        if (showFirstButton) {
+            if (width > 0) width += buttonGap;
+            width += measureNavButtonWidth(fm, "first");
+        }
         if (showPreviousButton) {
             if (width > 0) width += buttonGap;
             width += measureNavButtonWidth(fm, "prev");
@@ -305,7 +614,10 @@ public class PaginationComponent extends JComponent {
     private int measureNumbersModeWidth(FontMetrics fm) {
         int width = 0;
 
-        if (showFirstButton) width += measureNavButtonWidth(fm, "first");
+        if (showFirstButton) {
+            if (width > 0) width += buttonGap;
+            width += measureNavButtonWidth(fm, "first");
+        }
         if (showPreviousButton) {
             if (width > 0) width += buttonGap;
             width += measureNavButtonWidth(fm, "prev");
@@ -348,15 +660,20 @@ public class PaginationComponent extends JComponent {
             width += fm.stringWidth(label);
         }
 
-        width += 16; // left-right padding
+        width += 16;
         return Math.max(buttonWidth, width);
+    }
+
+    private int findPageSizeSelectorX(FontMetrics fm) {
+        return getWidth() - padding - getPageSizeSelectorGroupWidth(fm);
     }
 
     @Override
     public Dimension getPreferredSize() {
         FontMetrics fm = getFontMetrics(getFont());
         int contentWidth = type == TYPE_INPUT ? measureInputModeWidth(fm) : measureNumbersModeWidth(fm);
-        int width = contentWidth + (padding * 2) + 10;
+        int selectorWidth = showPageSizeSelector ? getPageSizeSelectorGroupWidth(fm) + buttonGap : 0;
+        int width = contentWidth + selectorWidth + (padding * 2) + 10;
         int height = Math.max(buttonHeight, getFieldHeight()) + (padding * 2) + 4;
         return new Dimension(Math.max(width, 180), Math.max(height, 36));
     }
@@ -398,7 +715,6 @@ public class PaginationComponent extends JComponent {
     }
 
     private void paintOuterBackground(Graphics2D g2, int w, int h) {
-        // Respect full transparency
         if (background != null && background.getAlpha() > 0) {
             g2.setColor(background);
             g2.fillRoundRect(0, 0, w - 1, h - 1, cornerRadius, cornerRadius);
@@ -410,6 +726,7 @@ public class PaginationComponent extends JComponent {
             int inset = Math.max(0, borderWidth / 2);
             g2.drawRoundRect(inset, inset, w - borderWidth - 1, h - borderWidth - 1, cornerRadius, cornerRadius);
         }
+
     }
 
     private void paintInputMode(Graphics2D g2) {
@@ -460,8 +777,14 @@ public class PaginationComponent extends JComponent {
 
         if (showLastButton) {
             int bw = measureNavButtonWidth(fm, "last");
-            paintNavButton(g2, "last", x, y, bw, buttonHeight, currentPage >= totalPages);
+            x = paintNavButton(g2, "last", x, y, bw, buttonHeight, currentPage >= totalPages);
         }
+
+        if (showPageSizeSelector) {
+            paintPageSizeSelectorLabel(g2, findPageSizeSelectorX(fm), fm);
+        }
+
+        // JComboBox paints itself
     }
 
     private void paintNumbersMode(Graphics2D g2) {
@@ -495,7 +818,7 @@ public class PaginationComponent extends JComponent {
             if (token.ellipsis) {
                 drawCenteredText(g2, token.text, r, getFont(), secondaryTextColor);
             } else {
-                paintPageButton(g2, "page:" + token.page, token.text, r, token.page == currentPage);
+                paintPageButton(g2, "page:" + token.page, token.text, r, token.page == currentPage, token.page);
             }
 
             x += width;
@@ -512,7 +835,11 @@ public class PaginationComponent extends JComponent {
 
         if (showLastButton) {
             int bw = measureNavButtonWidth(fm, "last");
-            paintNavButton(g2, "last", x, y, bw, buttonHeight, currentPage >= totalPages);
+            x = paintNavButton(g2, "last", x, y, bw, buttonHeight, currentPage >= totalPages);
+        }
+
+        if (showPageSizeSelector) {
+            paintPageSizeSelectorLabel(g2, findPageSizeSelectorX(fm), fm);
         }
     }
 
@@ -657,14 +984,55 @@ public class PaginationComponent extends JComponent {
         drawSingleChevronRight(g, x + 6, cy);
     }
 
-    private void paintPageButton(Graphics2D g2, String key, String text, Rectangle r, boolean selected) {
+    private void paintPageButton(Graphics2D g2, String key, String text, Rectangle r, boolean selected, int page) {
         boolean hovered = key.equals(hoveredKey);
         boolean pressed = key.equals(pressedKey);
 
+        if (animationMode != ANIMATION_NONE && animationProgress < 1f && type == TYPE_NUMBERS) {
+            if (page == animationFromPage && page != animationToPage) {
+                paintAnimatedPageButton(g2, r, text, false, false, 1f - animationProgress, page, -1);
+                hitRegions.add(new HitRegion(key, r));
+                return;
+            } else if (page == animationToPage) {
+                paintAnimatedPageButton(g2, r, text, true, true, animationProgress, page, animationFromPage);
+                hitRegions.add(new HitRegion(key, r));
+                return;
+            }
+        }
+
         paintPageButtonBase(g2, r, selected, hovered, pressed);
         drawCenteredText(g2, text, r, getFont(), selected ? selectedPageForeground : foreground);
-
         hitRegions.add(new HitRegion(key, r));
+    }
+
+    private void paintAnimatedPageButton(Graphics2D g2, Rectangle r, String text, boolean selected, boolean incoming, float progress, int page, int fromPage) {
+        Graphics2D g = (Graphics2D) g2.create();
+        try {
+            progress = Math.max(0f, Math.min(1f, progress));
+
+            float alpha = progress;
+            int offsetX = 0;
+
+            if (animationMode == ANIMATION_SLIDE) {
+                int direction = 0;
+                if (fromPage >= 0) {
+                    direction = Integer.compare(page, fromPage);
+                }
+                int maxOffset = Math.max(8, r.width / 4);
+                if (incoming) {
+                    offsetX = (int) ((1f - progress) * maxOffset * (direction >= 0 ? 1 : -1));
+                } else {
+                    offsetX = (int) (progress * maxOffset * (direction >= 0 ? -1 : 1));
+                }
+            }
+
+            g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
+            Rectangle shifted = new Rectangle(r.x + offsetX, r.y, r.width, r.height);
+            paintPageButtonBase(g, shifted, selected, false, false);
+            drawCenteredText(g, text, shifted, getFont(), selected ? selectedPageForeground : foreground);
+        } finally {
+            g.dispose();
+        }
     }
 
     private void paintPageButtonBase(Graphics2D g2, Rectangle r, boolean selected, boolean hovered, boolean pressed) {
@@ -742,17 +1110,17 @@ public class PaginationComponent extends JComponent {
 
     private void handleClick(String key) {
         if ("first".equals(key)) {
-            setCurrentPage(1);
+            setCurrentPageInternal(1, "first");
         } else if ("prev".equals(key)) {
-            setCurrentPage(currentPage - 1);
+            setCurrentPageInternal(currentPage - 1, "prev");
         } else if ("next".equals(key)) {
-            setCurrentPage(currentPage + 1);
+            setCurrentPageInternal(currentPage + 1, "next");
         } else if ("last".equals(key)) {
-            setCurrentPage(totalPages);
+            setCurrentPageInternal(totalPages, "last");
         } else if (key != null && key.startsWith("page:")) {
             try {
                 int page = Integer.parseInt(key.substring(5));
-                setCurrentPage(page);
+                setCurrentPageInternal(page, "page");
             } catch (Exception ignored) {
                 // Ignore invalid page token
             }
@@ -776,7 +1144,7 @@ public class PaginationComponent extends JComponent {
             if (autoClampPage) {
                 value = clampPage(value);
             }
-            setCurrentPage(value);
+            setCurrentPageInternal(value, "pageInput");
         } catch (NumberFormatException ex) {
             updatePageField();
         }
@@ -797,6 +1165,95 @@ public class PaginationComponent extends JComponent {
         boolean visible = type == TYPE_INPUT && showPageInput;
         pageField.setVisible(visible);
         syncFieldStyle();
+        repaint();
+    }
+
+    private void updatePageSizeComboVisibility() {
+        pageSizeCombo.setVisible(showPageSizeSelector);
+        revalidate();
+        repaint();
+    }
+
+    private void startPageChangeAnimation(int fromPage, int toPage) {
+        if (animationMode == ANIMATION_NONE || type != TYPE_NUMBERS || fromPage == toPage) {
+            animationProgress = 1f;
+            animationFromPage = -1;
+            animationToPage = -1;
+            repaint();
+            return;
+        }
+
+        animationFromPage = fromPage;
+        animationToPage = toPage;
+        animationProgress = 0f;
+
+        if (animationTimer.isRunning()) {
+            animationTimer.stop();
+        }
+        animationTimer.start();
+    }
+
+    private void stepAnimation() {
+        if (animationDurationMs <= 0) {
+            animationProgress = 1f;
+        } else {
+            animationProgress += 15f / (float) animationDurationMs;
+        }
+
+        if (animationProgress >= 1f) {
+            animationProgress = 1f;
+            animationTimer.stop();
+            animationFromPage = -1;
+            animationToPage = -1;
+        }
+        repaint();
+    }
+
+    private void firePageChangeTrigger(String source) {
+        int old = this.pageChangeTrigger;
+        this.pageChangeTrigger++;
+        String oldSource = this.lastPageChangeSource;
+        this.lastPageChangeSource = source != null ? source : "unknown";
+        firePropertyChange("lastPageChangeSource", oldSource, this.lastPageChangeSource);
+        firePropertyChange("pageChangeTrigger", old, this.pageChangeTrigger);
+    }
+
+    private void firePageSizeChangeTrigger() {
+        int old = this.pageSizeChangeTrigger;
+        this.pageSizeChangeTrigger++;
+        firePropertyChange("pageSizeChangeTrigger", old, this.pageSizeChangeTrigger);
+    }
+
+    private void setCurrentPageInternal(int currentPage, String source) {
+        int value = autoClampPage ? clampPage(currentPage) : currentPage;
+        int old = this.currentPage;
+        if (old == value) {
+            updatePageField();
+            return;
+        }
+
+        this.currentPage = value;
+        firePropertyChange("currentPage", old, value);
+        updatePageField();
+        startPageChangeAnimation(old, value);
+        firePageChangeTrigger(source);
+        repaint();
+    }
+
+    private void setPageSize(int newPageSize, String source) {
+        int value = Math.max(1, newPageSize);
+        int old = this.pageSize;
+        if (old == value) {
+            return;
+        }
+
+        this.pageSize = value;
+        firePropertyChange("pageSize", old, value);
+        firePageSizeChangeTrigger();
+        firePageChangeTrigger(source);
+
+        refreshPageSizeOptions();
+        revalidate();
         repaint();
     }
 
@@ -918,16 +1375,7 @@ public class PaginationComponent extends JComponent {
     }
 
     public void setCurrentPage(int currentPage) {
-        int value = autoClampPage ? clampPage(currentPage) : currentPage;
-        int old = this.currentPage;
-        if (old == value) {
-            updatePageField();
-            return;
-        }
-        this.currentPage = value;
-        firePropertyChange("currentPage", old, value);
-        updatePageField();
-        repaint();
+        setCurrentPageInternal(currentPage, "property");
     }
 
     public int getTotalPages() {
@@ -942,7 +1390,7 @@ public class PaginationComponent extends JComponent {
         firePropertyChange("totalPages", old, newValue);
 
         if (currentPage > this.totalPages) {
-            setCurrentPage(this.totalPages);
+            setCurrentPageInternal(this.totalPages, "totalPages");
         } else {
             revalidate();
             repaint();
@@ -961,6 +1409,41 @@ public class PaginationComponent extends JComponent {
         firePropertyChange("visiblePageCount", old, newValue);
         revalidate();
         repaint();
+    }
+
+    public int getPageSize() {
+        return pageSize;
+    }
+
+    public void setPageSize(int pageSize) {
+        setPageSize(pageSize, "property");
+    }
+
+    public String getPageSizeOptions() {
+        return pageSizeOptions;
+    }
+
+    public void setPageSizeOptions(String pageSizeOptions) {
+        String old = this.pageSizeOptions;
+        String value = pageSizeOptions != null ? pageSizeOptions : "";
+        if (value.equals(old)) return;
+        this.pageSizeOptions = value;
+        firePropertyChange("pageSizeOptions", old, this.pageSizeOptions);
+        refreshPageSizeOptions();
+        revalidate();
+        repaint();
+    }
+
+    public int getPageChangeTrigger() {
+        return pageChangeTrigger;
+    }
+
+    public int getPageSizeChangeTrigger() {
+        return pageSizeChangeTrigger;
+    }
+
+    public String getLastPageChangeSource() {
+        return lastPageChangeSource;
     }
 
     @Override
@@ -1141,7 +1624,60 @@ public class PaginationComponent extends JComponent {
         if (old == autoClampPage) return;
         this.autoClampPage = autoClampPage;
         firePropertyChange("autoClampPage", old, autoClampPage);
-        setCurrentPage(currentPage);
+        setCurrentPageInternal(currentPage, "autoClamp");
+    }
+
+    public boolean isKeyboardNavigationEnabled() {
+        return keyboardNavigationEnabled;
+    }
+
+    public void setKeyboardNavigationEnabled(boolean keyboardNavigationEnabled) {
+        boolean old = this.keyboardNavigationEnabled;
+        if (old == keyboardNavigationEnabled) return;
+        this.keyboardNavigationEnabled = keyboardNavigationEnabled;
+        firePropertyChange("keyboardNavigationEnabled", old, keyboardNavigationEnabled);
+    }
+
+    public boolean isShowPageSizeSelector() {
+        return showPageSizeSelector;
+    }
+
+    public void setShowPageSizeSelector(boolean showPageSizeSelector) {
+        boolean old = this.showPageSizeSelector;
+        if (old == showPageSizeSelector) return;
+        this.showPageSizeSelector = showPageSizeSelector;
+        firePropertyChange("showPageSizeSelector", old, showPageSizeSelector);
+        updatePageSizeComboVisibility();
+    }
+
+    public int getAnimationMode() {
+        return animationMode;
+    }
+
+    public void setAnimationMode(int animationMode) {
+        int old = this.animationMode;
+        if (old == animationMode) return;
+        this.animationMode = animationMode;
+        firePropertyChange("animationMode", old, animationMode);
+        if (animationMode == ANIMATION_NONE && animationTimer.isRunning()) {
+            animationTimer.stop();
+            animationProgress = 1f;
+            animationFromPage = -1;
+            animationToPage = -1;
+        }
+        repaint();
+    }
+
+    public int getAnimationDurationMs() {
+        return animationDurationMs;
+    }
+
+    public void setAnimationDurationMs(int animationDurationMs) {
+        int value = Math.max(0, animationDurationMs);
+        int old = this.animationDurationMs;
+        if (old == value) return;
+        this.animationDurationMs = value;
+        firePropertyChange("animationDurationMs", old, value);
     }
 
     public int getNavLabelMode() {
@@ -1477,7 +2013,7 @@ public class PaginationComponent extends JComponent {
 
     public void setIconColor(Color iconColor) {
         Color old = this.iconColor;
-        Color value = iconColor != null ? iconColor : new Color(90, 150, 220);
+        Color value = iconColor != null ? iconColor : new Color(100, 120, 145);
         if (value.equals(old)) return;
         this.iconColor = value;
         firePropertyChange("iconColor", old, this.iconColor);
@@ -1509,6 +2045,20 @@ public class PaginationComponent extends JComponent {
         repaint();
     }
 
+    public int getPageSizeSelectorWidth() {
+        return pageSizeSelectorWidth;
+    }
+
+    public void setPageSizeSelectorWidth(int pageSizeSelectorWidth) {
+        int value = Math.max(48, pageSizeSelectorWidth);
+        int old = this.pageSizeSelectorWidth;
+        if (old == value) return;
+        this.pageSizeSelectorWidth = value;
+        firePropertyChange("pageSizeSelectorWidth", old, this.pageSizeSelectorWidth);
+        revalidate();
+        repaint();
+    }
+
     @Override
     public void setFont(Font font) {
         Font old = getFont();
@@ -1516,14 +2066,13 @@ public class PaginationComponent extends JComponent {
         if (pageField != null) {
             pageField.setFont(getFont());
         }
+        if (pageSizeCombo != null) {
+            pageSizeCombo.setFont(getFont());
+        }
         firePropertyChange("font", old, getFont());
         revalidate();
         repaint();
     }
-
-    // -------------------------------------------------------------------------
-    // Helper classes
-    // -------------------------------------------------------------------------
 
     private static class HitRegion {
         final String key;
