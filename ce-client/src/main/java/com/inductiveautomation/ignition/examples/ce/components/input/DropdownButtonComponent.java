@@ -5,8 +5,6 @@ import com.inductiveautomation.ignition.common.BasicDataset;
 import com.inductiveautomation.ignition.common.Dataset;
 
 import javax.swing.*;
-import javax.swing.event.PopupMenuEvent;
-import javax.swing.event.PopupMenuListener;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.Line2D;
@@ -73,20 +71,15 @@ public class DropdownButtonComponent extends JComponent
     private int topNotchHeight = 6;
 
     // ---------------------------------
-    // Popup
+    // Popup (JWindow strategy)
     // ---------------------------------
-    private JPopupMenu popupMenu;
-    private PopupListPanel popupPanel;
+    private PopupWindow popupWindow;
+    private final PopupListPanel popupPanel;
+    private AWTEventListener outsideClickListener;
     private long lastToggleTime = 0L;
 
     public DropdownButtonComponent() {
         popupPanel = new PopupListPanel();
-
-        popupMenu = new JPopupMenu();
-        popupMenu.setOpaque(false);
-        popupMenu.setBorder(BorderFactory.createEmptyBorder());
-        popupMenu.setLayout(new BorderLayout());
-        popupMenu.add(popupPanel, BorderLayout.CENTER);
 
         setPreferredSize(new Dimension(335, headerHeight));
         setMinimumSize(new Dimension(140, headerHeight));
@@ -105,10 +98,8 @@ public class DropdownButtonComponent extends JComponent
     }
 
     private void refreshPopupPanel() {
-        if (popupPanel != null) {
-            popupPanel.revalidate();
-            popupPanel.repaint();
-        }
+        popupPanel.revalidate();
+        popupPanel.repaint();
     }
 
     // ---------------------------------
@@ -264,8 +255,17 @@ public class DropdownButtonComponent extends JComponent
         this.data = (data != null) ? data : createDefaultDataset();
         clampSelectedIndex();
         firePropertyChange("data", old, this.data);
+
+        if (hoverIndex >= getRowCount()) {
+            setHoverIndex(-1);
+        }
+
         refreshPopupPanel();
         repaint();
+
+        if (isOpen()) {
+            openPopup();
+        }
     }
 
     public int getSelectedIndex() {
@@ -351,6 +351,10 @@ public class DropdownButtonComponent extends JComponent
         this.rowHeight = Math.max(22, rowHeight);
         firePropertyChange("rowHeight", old, this.rowHeight);
         refreshPopupPanel();
+
+        if (isOpen()) {
+            openPopup();
+        }
     }
 
     public Color getHeaderBackground() {
@@ -529,6 +533,10 @@ public class DropdownButtonComponent extends JComponent
         refreshPopupPanel();
         firePropertyChange("font", old, font);
         repaint();
+
+        if (isOpen()) {
+            openPopup();
+        }
     }
 
     @Override
@@ -539,9 +547,7 @@ public class DropdownButtonComponent extends JComponent
 
         if (!enabled) {
             pressed = false;
-            if (popupMenu != null && popupMenu.isVisible()) {
-                popupMenu.setVisible(false);
-            }
+            hidePopup();
             setCursor(Cursor.getDefaultCursor());
         } else {
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -647,68 +653,94 @@ public class DropdownButtonComponent extends JComponent
     // Popup helpers
     // ---------------------------------
 
-    private void openPopup() {
-        if (!isEnabled() || popupMenu == null || popupPanel == null) {
+    private Window getOwnerWindow() {
+        return SwingUtilities.getWindowAncestor(this);
+    }
+
+    private void ensurePopupWindow() {
+        Window owner = getOwnerWindow();
+        if (owner == null) {
             return;
         }
 
-        popupPanel.revalidate();
-        popupPanel.repaint();
-
-        Dimension popupSize = popupPanel.getPreferredSize();
-        int popupW = popupSize.width;
-        int popupH = popupSize.height;
-
-        int x = 0;
-        int y = getHeight() + 5;
-
-        try {
-            Point screenPt = getLocationOnScreen();
-            Rectangle screenBounds = getScreenBoundsFor(screenPt);
-
-            int spaceBelow = screenBounds.y + screenBounds.height - (screenPt.y + getHeight());
-            int spaceAbove = screenPt.y - screenBounds.y;
-
-            if (spaceBelow < popupH + 8 && spaceAbove > popupH + 8) {
-                y = -popupH - 2;
+        if (popupWindow == null || popupWindow.getOwner() != owner) {
+            if (popupWindow != null) {
+                popupWindow.dispose();
             }
 
-            int desiredRight = screenPt.x + popupW;
-            int screenRight = screenBounds.x + screenBounds.width;
-            if (desiredRight > screenRight) {
-                x -= (desiredRight - screenRight) + 4;
-            }
+            popupWindow = new PopupWindow(owner);
+            popupWindow.getContentPane().setLayout(new BorderLayout());
+            popupWindow.getContentPane().add(popupPanel, BorderLayout.CENTER);
+        }
+    }
 
-            int desiredLeft = screenPt.x + x;
-            if (desiredLeft < screenBounds.x) {
-                x += (screenBounds.x - desiredLeft) + 4;
-            }
-        } catch (IllegalComponentStateException ignored) {
+    private Dimension getPopupPanelSize() {
+        return popupPanel.getPreferredSize();
+    }
+
+    private void openPopup() {
+        if (!isEnabled()) {
+            return;
         }
 
-        popupMenu.show(this, x, y);
+        ensurePopupWindow();
+        if (popupWindow == null) {
+            return;
+        }
+
         setOpen(true);
 
-        popupMenu.addPopupMenuListener(new PopupMenuListener() {
-            @Override
-            public void popupMenuWillBecomeVisible(PopupMenuEvent e) { }
+        Dimension popupSize = getPopupPanelSize();
+        popupPanel.setPreferredSize(popupSize);
+        popupPanel.setSize(popupSize);
+        popupWindow.pack();
 
-            @Override
-            public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {
-                setOpen(false);
-                setHoverIndex(-1);
-                lastToggleTime = System.currentTimeMillis();
-                popupMenu.removePopupMenuListener(this);
-            }
+        Point screenPt;
+        try {
+            screenPt = getLocationOnScreen();
+        } catch (IllegalComponentStateException ignored) {
+            return;
+        }
 
-            @Override
-            public void popupMenuCanceled(PopupMenuEvent e) {
-                setOpen(false);
-                setHoverIndex(-1);
-                lastToggleTime = System.currentTimeMillis();
-                popupMenu.removePopupMenuListener(this);
-            }
-        });
+        int x = screenPt.x;
+        int y = screenPt.y + getHeight() + 5;
+
+        Rectangle screenBounds = getScreenBoundsFor(screenPt);
+
+        int spaceBelow = screenBounds.y + screenBounds.height - (screenPt.y + getHeight());
+        int spaceAbove = screenPt.y - screenBounds.y;
+
+        if (spaceBelow < popupSize.height + 8 && spaceAbove > popupSize.height + 8) {
+            y = screenPt.y - popupSize.height - 2;
+        }
+
+        if (x + popupSize.width > screenBounds.x + screenBounds.width) {
+            x = screenBounds.x + screenBounds.width - popupSize.width - 2;
+        }
+        if (x < screenBounds.x) {
+            x = screenBounds.x + 2;
+        }
+        if (y + popupSize.height > screenBounds.y + screenBounds.height) {
+            y = screenBounds.y + screenBounds.height - popupSize.height - 2;
+        }
+        if (y < screenBounds.y) {
+            y = screenBounds.y + 2;
+        }
+
+        popupWindow.setLocation(x, y);
+        popupWindow.setVisible(true);
+        installOutsideClickListener();
+        popupPanel.repaint();
+    }
+
+    private void hidePopup() {
+        if (popupWindow != null) {
+            popupWindow.setVisible(false);
+        }
+        uninstallOutsideClickListener();
+        setOpen(false);
+        setHoverIndex(-1);
+        lastToggleTime = System.currentTimeMillis();
     }
 
     private Rectangle getScreenBoundsFor(Point pointOnScreen) {
@@ -731,6 +763,82 @@ public class DropdownButtonComponent extends JComponent
 
         Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
         return new Rectangle(0, 0, screen.width, screen.height);
+    }
+
+    private void installOutsideClickListener() {
+        if (outsideClickListener != null) {
+            return;
+        }
+
+        outsideClickListener = new AWTEventListener() {
+            @Override
+            public void eventDispatched(AWTEvent event) {
+                if (!(event instanceof MouseEvent)) {
+                    return;
+                }
+
+                MouseEvent me = (MouseEvent) event;
+                if (me.getID() != MouseEvent.MOUSE_PRESSED) {
+                    return;
+                }
+
+                if (!isOpen() || popupWindow == null || !popupWindow.isVisible()) {
+                    return;
+                }
+
+                Object src = me.getSource();
+                if (!(src instanceof Component)) {
+                    hidePopup();
+                    return;
+                }
+
+                Component c = (Component) src;
+                if (SwingUtilities.isDescendingFrom(c, DropdownButtonComponent.this)) {
+                    return;
+                }
+                if (SwingUtilities.isDescendingFrom(c, popupPanel)) {
+                    return;
+                }
+                if (SwingUtilities.isDescendingFrom(c, popupWindow)) {
+                    return;
+                }
+
+                hidePopup();
+            }
+        };
+
+        Toolkit.getDefaultToolkit().addAWTEventListener(
+                outsideClickListener,
+                AWTEvent.MOUSE_EVENT_MASK
+        );
+    }
+
+    private void uninstallOutsideClickListener() {
+        if (outsideClickListener != null) {
+            Toolkit.getDefaultToolkit().removeAWTEventListener(outsideClickListener);
+            outsideClickListener = null;
+        }
+    }
+
+    private void togglePopup() {
+        if (!isEnabled()) {
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+        if (now - lastToggleTime < 150) {
+            return;
+        }
+
+        requestFocusInWindow();
+
+        if (isOpen()) {
+            hidePopup();
+        } else {
+            openPopup();
+        }
+
+        lastToggleTime = now;
     }
 
     // ---------------------------------
@@ -822,6 +930,10 @@ public class DropdownButtonComponent extends JComponent
         g2.fill(poly);
     }
 
+    private int getHeaderArrowCenterXLocal() {
+        return getWidth() - 20;
+    }
+
     private String resolveHeaderText() {
         if (text != null && !text.trim().isEmpty()) {
             return text;
@@ -838,29 +950,48 @@ public class DropdownButtonComponent extends JComponent
             return null;
         }
 
-        FontMetrics fm = g2.getFontMetrics(getFont());
-        int textW = fm.stringWidth(label != null ? label : "");
-        int centerX = getWidth() / 2;
-        int textLeft = centerX - (textW / 2);
-        int textRight = centerX + (textW / 2);
+        int size = Math.max(8, iconSize);
+        int h = headerHeight;
+        int padding = Math.max(10, h / 4);
 
-        int y = (headerHeight - iconSize) / 2;
-        int x;
+        FontMetrics fm = g2.getFontMetrics(getFont());
+        int textWidth = fm.stringWidth(label != null ? label : "");
+
+        int centerX = getWidth() / 2;
+        int textLeft = centerX - (textWidth / 2);
+        int textRight = centerX + (textWidth / 2);
+
+        int iconY = (h - size) / 2;
+        int iconX;
 
         if (iconLocation == ICON_RIGHT) {
-            x = textRight + iconGap;
-            x = Math.min(x, getWidth() - 30 - iconSize);
+            iconX = textRight + iconGap;
+            int maxX = getWidth() - padding - size - 18;
+            if (iconX > maxX) {
+                iconX = maxX;
+            }
         } else {
-            x = textLeft - iconGap - iconSize;
-            x = Math.max(x, 8);
+            iconX = textLeft - iconGap - size;
+            if (iconX < padding) {
+                iconX = padding;
+            }
         }
 
-        return new Rectangle(x, y, iconSize, iconSize);
+        return new Rectangle(iconX, iconY, size, size);
     }
 
     // ---------------------------------
-    // Popup list panel
+    // Popup window/panel
     // ---------------------------------
+
+    private class PopupWindow extends JWindow {
+        PopupWindow(Window owner) {
+            super(owner);
+            setBackground(new Color(0, 0, 0, 0));
+            setFocusableWindowState(false);
+            setAlwaysOnTop(false);
+        }
+    }
 
     private class PopupListPanel extends JPanel implements MouseListener, MouseMotionListener {
 
@@ -871,30 +1002,37 @@ public class DropdownButtonComponent extends JComponent
             addMouseMotionListener(this);
         }
 
-        @Override
-        public Dimension getPreferredSize() {
-            int w = Math.max(DropdownButtonComponent.this.getWidth(), 140);
-            int listH = getRowCount() * rowHeight;
-            int extraTop = (showTopNotch ? topNotchHeight : 0);
-            return new Dimension(w, extraTop + listH + 2);
+        private int getNotchSpace() {
+            return showTopNotch ? Math.max(0, topNotchHeight) : 0;
         }
 
-        private int getRowsStartY() {
-            return showTopNotch ? topNotchHeight : 0;
+        @Override
+        public Dimension getPreferredSize() {
+            int width = Math.max(DropdownButtonComponent.this.getWidth(), 140);
+            int notchSpace = getNotchSpace();
+            int height = notchSpace + (getRowCount() * rowHeight);
+            return new Dimension(width, Math.max(2, height));
+        }
+
+        private int getMenuStartY() {
+            return getNotchSpace();
         }
 
         private int rowAt(Point p) {
             if (p == null) {
                 return -1;
             }
-            int y = p.y - getRowsStartY();
+
+            int y = p.y - getMenuStartY();
             if (y < 0) {
                 return -1;
             }
+
             int idx = y / rowHeight;
             if (idx < 0 || idx >= getRowCount()) {
                 return -1;
             }
+
             return idx;
         }
 
@@ -903,160 +1041,187 @@ public class DropdownButtonComponent extends JComponent
             super.paintComponent(g);
 
             Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            try {
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
 
-            int w = getWidth();
-            int notchH = showTopNotch ? topNotchHeight : 0;
-            int startRowsY = notchH;
-            int listH = getRowCount() * rowHeight;
+                int w = getWidth();
+                int menuY = getMenuStartY();
+                int menuH = getRowCount() * rowHeight;
 
-            if (listH <= 0) {
-                g2.dispose();
-                return;
-            }
-
-            float triBaseX = w - 20f;
-            float triBaseY = startRowsY;
-
-            if (showTopNotch && topNotchHeight > 0) {
-                Path2D tri = new Path2D.Float();
-                tri.moveTo(triBaseX - (topNotchWidth / 2f), triBaseY);
-                tri.lineTo(triBaseX, triBaseY - topNotchHeight);
-                tri.lineTo(triBaseX + (topNotchWidth / 2f), triBaseY);
-                tri.closePath();
-
-                g2.setColor(listBackground);
-                g2.fill(tri);
-
-                if (strokeWidth > 0f) {
-                    g2.setColor(strokeColor);
-                    g2.setStroke(new BasicStroke(strokeWidth));
-                    g2.draw(tri);
-
-                    g2.setColor(listBackground);
-                    g2.setStroke(new BasicStroke(Math.max(2f, strokeWidth + 1f)));
-                    g2.drawLine(
-                            (int) (triBaseX - (topNotchWidth / 2f) + 1),
-                            (int) triBaseY,
-                            (int) (triBaseX + (topNotchWidth / 2f) - 1),
-                            (int) triBaseY
-                    );
+                if (menuH <= 0) {
+                    return;
                 }
+
+                float stroke = Math.max(0f, strokeWidth);
+                float halfStroke = stroke / 2f;
+
+                int notchX = getHeaderArrowCenterXLocal();
+                int notchW = Math.max(6, topNotchWidth);
+                int notchH = getNotchSpace();
+
+                float r = 4f;
+
+                float x = halfStroke;
+                float y = menuY + halfStroke;
+                float ww = w - stroke - 1f;
+                float hh = menuH - stroke - 1f;
+
+                Path2D bubble = createBubblePath(x, y, ww, hh, r, notchX, notchW, notchH);
+
+                // Fill popup background
+                g2.setColor(listBackground);
+                g2.fill(bubble);
+
+                // Paint rows clipped INSIDE the border
+                Shape oldClip = g2.getClip();
+                g2.clip(bubble);
+                paintRows(g2, w, menuY, stroke);
+                g2.setClip(oldClip);
+
+                // Draw border LAST so it stays consistent on all sides
+                if (stroke > 0f) {
+                    g2.setColor(strokeColor);
+                    g2.setStroke(new BasicStroke(stroke, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                    g2.draw(bubble);
+                }
+
+            } finally {
+                g2.dispose();
             }
-
-            for (int i = 6; i >= 1; i--) {
-                int alpha = (int) (20f * (i / 6f));
-                g2.setColor(new Color(0, 0, 0, alpha));
-                g2.drawRoundRect(-i, startRowsY + 2 - i, w + (i * 2), listH + (i * 2), 6, 6);
-            }
-
-            g2.setColor(listBackground);
-            g2.fillRoundRect(0, startRowsY, w - 1, listH, 4, 4);
-
-            if (strokeWidth > 0f) {
-                g2.setColor(strokeColor);
-                g2.setStroke(new BasicStroke(strokeWidth));
-                g2.drawRoundRect(0, startRowsY, w - 1, listH, 4, 4);
-            }
-
-            paintRows(g2, startRowsY, w);
-            g2.dispose();
         }
 
-        private void paintRows(Graphics2D g2, int startRowsY, int w) {
-            FontMetrics fm = g2.getFontMetrics(getFont());
+        private Path2D createBubblePath(float x, float y, float w, float h, float r,
+                                        int notchX, int notchW, int notchH) {
+            Path2D bubble = new Path2D.Float();
 
-            for (int i = 0; i < getRowCount(); i++) {
-                int iy = startRowsY + (i * rowHeight);
-                String label = getLabelAt(i);
+            bubble.moveTo(x + r, y);
 
-                if (isDividerRow(i)) {
-                    float lineY = iy + (rowHeight / 2f);
-                    g2.setColor(new Color(233, 236, 239));
-                    g2.draw(new Line2D.Float(1, lineY, w - 2, lineY));
+            if (notchH > 0) {
+                float leftNotch = notchX - (notchW / 2f);
+                float rightNotch = notchX + (notchW / 2f);
+
+                leftNotch = Math.max(x + r + 2f, leftNotch);
+                rightNotch = Math.min(x + w - r - 2f, rightNotch);
+
+                if (leftNotch > x + r) {
+                    bubble.lineTo(leftNotch, y);
+                }
+                bubble.lineTo(notchX, y - notchH);
+                bubble.lineTo(rightNotch, y);
+            }
+
+            bubble.lineTo(x + w - r, y);
+            bubble.quadTo(x + w, y, x + w, y + r);
+            bubble.lineTo(x + w, y + h - r);
+            bubble.quadTo(x + w, y + h, x + w - r, y + h);
+            bubble.lineTo(x + r, y + h);
+            bubble.quadTo(x, y + h, x, y + h - r);
+            bubble.lineTo(x, y + r);
+            bubble.quadTo(x, y, x + r, y);
+            bubble.closePath();
+
+            return bubble;
+        }
+
+        private void paintRows(Graphics2D g2, int w, int menuY, float stroke) {
+            Font itemFont = DropdownButtonComponent.this.getFont() != null
+                    ? DropdownButtonComponent.this.getFont()
+                    : new Font("SansSerif", Font.PLAIN, 13);
+
+            FontMetrics fm = g2.getFontMetrics(itemFont);
+
+            int inset = Math.max(1, (int) Math.ceil(stroke));
+            int contentLeft = inset;
+            int contentRight = w - inset;
+
+            for (int row = 0; row < getRowCount(); row++) {
+                int y = menuY + (row * rowHeight);
+                String label = getLabelAt(row);
+
+                if (isDividerRow(row)) {
+                    float lineY = y + (rowHeight / 2f);
+                    g2.setColor(new Color(225, 225, 225));
+                    g2.draw(new Line2D.Float(contentLeft, lineY, contentRight, lineY));
                     continue;
                 }
 
-                boolean hovered = (i == hoverIndex);
-                boolean selected = (i == selectedIndex);
+                boolean hovered = (row == hoverIndex);
+                boolean selected = (row == selectedIndex);
 
                 if (hovered) {
                     g2.setColor(hoverBackground);
-                    g2.fill(new Rectangle2D.Float(1, iy, w - 2, rowHeight));
+                    g2.fill(new Rectangle2D.Float(
+                            contentLeft,
+                            y,
+                            contentRight - contentLeft,
+                            rowHeight
+                    ));
                 }
 
-                Color textColor = hovered ? hoverForeground : new Color(33, 37, 41);
+                Color textColor = hovered ? hoverForeground : foreground;
+                int textX = 12 + inset;
 
-                int textX;
-                int markerX;
+                String itemIconPath = getItemIconPathAt(row);
+                Image itemIcon = loadIcon(itemIconPath);
 
-                if (itemIconPosition == ICON_RIGHT) {
-                    markerX = 10;
-                    textX = 30;
-                } else {
-                    markerX = w - 25;
-                    textX = 15;
-                }
+                if (itemIcon != null) {
+                    int iconSize = Math.max(8, itemIconSize);
+                    int iconY = y + (rowHeight - iconSize) / 2;
 
-                if (selected) {
-                    paintSelectedMarker(g2, markerX, iy, rowHeight, textColor, hovered, w);
-                }
-
-                String itemIconPath = getItemIconPathAt(i);
-                if (itemIconPath != null && !itemIconPath.isEmpty()) {
-                    Image img = loadIcon(itemIconPath);
-                    if (img != null) {
-                        int iconY = iy + (rowHeight - itemIconSize) / 2;
-
-                        if (itemIconPosition == ICON_LEFT) {
-                            paintTintedIcon(g2, img, 10, iconY, itemIconSize, textColor);
-                            textX = 10 + itemIconSize + 8;
-                        } else {
-                            int iconX = w - 15 - itemIconSize;
-                            paintTintedIcon(g2, img, iconX, iconY, itemIconSize, textColor);
-                        }
+                    if (itemIconPosition == ICON_LEFT) {
+                        int iconX = 10 + inset;
+                        paintTintedIcon(g2, itemIcon, iconX, iconY, iconSize, textColor);
+                        textX = iconX + iconSize + 8;
+                    } else {
+                        int iconX = contentRight - 12 - iconSize;
+                        paintTintedIcon(g2, itemIcon, iconX, iconY, iconSize, textColor);
                     }
                 }
 
+                if (selected) {
+                    paintSelectedMarker(g2, y, w, inset);
+                    if (selectedItemIconPosition == ICON_LEFT && selectedItemIconPath.isEmpty()) {
+                        textX = Math.max(textX, 26 + inset);
+                    }
+                }
+
+                g2.setFont(itemFont);
                 g2.setColor(textColor);
-                g2.setFont(getFont());
-                g2.drawString(label, textX, (int) (iy + (rowHeight / 2.0) + fm.getAscent() * 0.35));
+                g2.drawString(label, textX, y + ((rowHeight - fm.getHeight()) / 2) + fm.getAscent());
             }
         }
 
-        private void paintSelectedMarker(Graphics2D g2, int markerX, int rowY, int rowH, Color fallbackTextColor, boolean hovered, int width) {
-            Image markerImage = loadIcon(selectedItemIconPath);
+        private void paintSelectedMarker(Graphics2D g2, int rowY, int width, int inset) {
+            int size = Math.min(Math.max(8, itemIconSize), rowHeight - 8);
+            int y = rowY + (rowHeight - size) / 2;
 
-            if (markerImage != null) {
-                int size = Math.min(itemIconSize, rowH - 6);
-                int y = rowY + (rowH - size) / 2;
+            int x;
+            if (selectedItemIconPosition == ICON_RIGHT) {
+                x = width - inset - 12 - size;
+            } else {
+                x = 10 + inset;
+            }
 
-                int x = (selectedItemIconPosition == ICON_RIGHT)
-                        ? width - 15 - size
-                        : markerX;
-
-                paintTintedIcon(g2, markerImage, x, y, size, selectedItemIconColor);
+            Image selectedMarker = loadIcon(selectedItemIconPath);
+            if (selectedMarker != null) {
+                paintTintedIcon(g2, selectedMarker, x, y, size, selectedItemIconColor);
                 return;
             }
 
-            float checkScale = 0.7f;
-            float midY = rowY + (rowH / 2f);
-            float offsetY = (9f * checkScale) / 2f;
-            float startY = midY - offsetY;
+            float startX = x;
+            float startY = rowY + (rowHeight / 2f);
 
             Path2D check = new Path2D.Float();
-            check.moveTo(markerX, startY + (5 * checkScale));
-            check.lineTo(markerX + (4 * checkScale), startY + (9 * checkScale));
-            check.lineTo(markerX + (10 * checkScale), startY);
+            check.moveTo(startX, startY);
+            check.lineTo(startX + 4f, startY + 4f);
+            check.lineTo(startX + 10f, startY - 4f);
 
             g2.setColor(selectedItemIconColor != null ? selectedItemIconColor : new Color(13, 110, 253));
             g2.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
             g2.draw(check);
-            g2.setStroke(new BasicStroke(1f));
-
-            g2.setColor(hovered ? hoverForeground : fallbackTextColor);
         }
 
         @Override
@@ -1064,7 +1229,7 @@ public class DropdownButtonComponent extends JComponent
             int row = rowAt(e.getPoint());
             if (isSelectableRow(row)) {
                 setSelectedIndex(row);
-                popupMenu.setVisible(false);
+                hidePopup();
             }
         }
 
@@ -1077,11 +1242,7 @@ public class DropdownButtonComponent extends JComponent
             setHoverIndex(-1);
         }
 
-        @Override
-        public void mouseDragged(MouseEvent e) {
-            int row = rowAt(e.getPoint());
-            setHoverIndex(isSelectableRow(row) ? row : -1);
-        }
+        @Override public void mouseDragged(MouseEvent e) { }
 
         @Override
         public void mouseMoved(MouseEvent e) {
@@ -1105,27 +1266,32 @@ public class DropdownButtonComponent extends JComponent
         }
     }
 
-    private void paintTintedIcon(Graphics2D g2, Image image, int x, int y, int size, Color tint) {
-        if (image == null || size <= 0) {
+    private void paintTintedIcon(Graphics2D g2, Image img, int x, int y, int size, Color tint) {
+        if (img == null || size <= 0) {
             return;
         }
 
         BufferedImage bi = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
         Graphics2D ig = bi.createGraphics();
-        ig.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        ig.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-        ig.drawImage(image, 0, 0, size, size, null);
-        ig.setComposite(AlphaComposite.SrcIn);
-        ig.setColor(tint != null ? tint : Color.GRAY);
-        ig.fillRect(0, 0, size, size);
-        ig.dispose();
+        try {
+            ig.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            ig.drawImage(img, 0, 0, size, size, null);
+            ig.setComposite(AlphaComposite.SrcAtop);
+            ig.setColor(tint != null ? tint : Color.GRAY);
+            ig.fillRect(0, 0, size, size);
+        } finally {
+            ig.dispose();
+        }
 
         g2.drawImage(bi, x, y, null);
     }
 
     private Color withAlpha(Color c, int alpha) {
-        return new Color(c.getRed(), c.getGreen(), c.getBlue(), Math.max(0, Math.min(255, alpha)));
+        if (c == null) {
+            c = Color.GRAY;
+        }
+        alpha = Math.max(0, Math.min(255, alpha));
+        return new Color(c.getRed(), c.getGreen(), c.getBlue(), alpha);
     }
 
     // ---------------------------------
@@ -1138,29 +1304,14 @@ public class DropdownButtonComponent extends JComponent
             return;
         }
 
-        long now = System.currentTimeMillis();
-        if (now - lastToggleTime < 150) {
-            return;
-        }
-
-        if (e.getY() >= headerHeight) {
-            return;
-        }
-
-        pressed = true;
-        repaint();
-
-        if (popupMenu.isVisible()) {
-            popupMenu.setVisible(false);
-            lastToggleTime = now;
-        } else {
-            openPopup();
-            lastToggleTime = now;
+        if (e.getY() <= headerHeight) {
+            pressed = true;
+            repaint();
+            togglePopup();
         }
     }
 
-    @Override
-    public void mouseClicked(MouseEvent e) { }
+    @Override public void mouseClicked(MouseEvent e) { }
 
     @Override
     public void mouseReleased(MouseEvent e) {
@@ -1191,40 +1342,32 @@ public class DropdownButtonComponent extends JComponent
         }
 
         switch (e.getKeyCode()) {
+            case KeyEvent.VK_ENTER:
             case KeyEvent.VK_SPACE:
-            case KeyEvent.VK_ENTER: {
-                long now = System.currentTimeMillis();
-                if (now - lastToggleTime < 150) {
-                    return;
-                }
-
-                if (popupMenu.isVisible()) {
-                    popupMenu.setVisible(false);
-                } else {
-                    openPopup();
-                }
-                lastToggleTime = now;
+                togglePopup();
+                e.consume();
                 break;
-            }
 
             case KeyEvent.VK_ESCAPE:
-                if (popupMenu.isVisible()) {
-                    popupMenu.setVisible(false);
+                if (isOpen()) {
+                    hidePopup();
+                    e.consume();
                 }
                 break;
 
             case KeyEvent.VK_DOWN:
-                if (!popupMenu.isVisible()) {
+                if (!isOpen()) {
                     openPopup();
-                    lastToggleTime = System.currentTimeMillis();
                 } else {
                     moveSelection(1);
                 }
+                e.consume();
                 break;
 
             case KeyEvent.VK_UP:
-                if (popupMenu.isVisible()) {
+                if (isOpen()) {
                     moveSelection(-1);
+                    e.consume();
                 }
                 break;
 
@@ -1240,17 +1383,18 @@ public class DropdownButtonComponent extends JComponent
             return;
         }
 
-        int idx = (selectedIndex >= 0) ? selectedIndex : findFirstSelectableRow();
-        int next = idx;
+        int current = hoverIndex >= 0 ? hoverIndex : selectedIndex;
+        if (current < 0) {
+            current = findFirstSelectableRow();
+        }
 
+        int idx = current;
         do {
-            next += delta;
-            if (next < 0 || next >= getRowCount()) {
-                return;
-            }
-        } while (isDividerRow(next));
+            idx += delta;
+        } while (idx >= 0 && idx < getRowCount() && isDividerRow(idx));
 
-        setSelectedIndex(next);
-        setHoverIndex(next);
+        if (idx >= 0 && idx < getRowCount()) {
+            setHoverIndex(idx);
+        }
     }
 }
