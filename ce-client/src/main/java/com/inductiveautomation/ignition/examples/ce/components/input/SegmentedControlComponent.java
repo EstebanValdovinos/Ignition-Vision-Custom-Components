@@ -806,13 +806,13 @@ public class SegmentedControlComponent extends JComponent
         Color unselIcon = iconColor != null ? iconColor : fg;
 
         if (!isEnabled()) {
-            bg = withAlpha(bg, 150);
+            // bg = withAlpha(bg, 150);
             fg = new Color(165, 165, 170);
             selBg = withAlpha(selBg, 150);
             selFg = new Color(185, 185, 190);
             selIcon = new Color(185, 185, 190);
             hovBg = withAlpha(hovBg, 50);
-            bdr = withAlpha(bdr, 120);
+            // bdr = withAlpha(bdr, 120);
             div = withAlpha(div, 100);
             unselIcon = new Color(165, 165, 170);
         }

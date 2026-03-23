@@ -16,6 +16,7 @@ import com.inductiveautomation.ignition.examples.ce.components.input.DropdownBut
 import com.inductiveautomation.ignition.examples.ce.components.input.DateRangePickerComponent;
 import com.inductiveautomation.ignition.examples.ce.components.input.PopupMenuButtonComponent;
 import com.inductiveautomation.ignition.examples.ce.components.input.PaginationComponent;
+import com.inductiveautomation.ignition.examples.ce.components.input.ExpandableSearchBoxComponent;
 import com.inductiveautomation.vision.api.designer.VisionDesignerInterface;
 import com.inductiveautomation.vision.api.designer.palette.JavaBeanPaletteItem;
 import com.inductiveautomation.vision.api.designer.palette.Palette;
@@ -56,6 +57,7 @@ public class MyModuleDesignerHook extends AbstractDesignerModuleHook {
             group.addPaletteItem(new JavaBeanPaletteItem(PopupMenuButtonComponent.class));
             group.addPaletteItem(new JavaBeanPaletteItem(CardComponent.class));
             group.addPaletteItem(new JavaBeanPaletteItem(PaginationComponent.class));
+            group.addPaletteItem(new JavaBeanPaletteItem(ExpandableSearchBoxComponent.class));
         }
     }
 }
