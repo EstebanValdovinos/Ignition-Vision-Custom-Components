@@ -11,6 +11,7 @@ import com.inductiveautomation.ignition.examples.ce.components.display.TeslaLoad
 import com.inductiveautomation.ignition.examples.ce.components.display.ThermometerIndicatorComponent;
 import com.inductiveautomation.ignition.examples.ce.components.display.PieDonutChartComponent;
 import com.inductiveautomation.ignition.examples.ce.components.display.CardComponent;
+import com.inductiveautomation.ignition.examples.ce.components.display.MessageLogCardComponent;
 import com.inductiveautomation.ignition.examples.ce.components.input.SegmentedControlComponent;
 import com.inductiveautomation.ignition.examples.ce.components.input.DropdownButtonComponent;
 import com.inductiveautomation.ignition.examples.ce.components.input.DateRangePickerComponent;
@@ -58,6 +59,7 @@ public class MyModuleDesignerHook extends AbstractDesignerModuleHook {
             group.addPaletteItem(new JavaBeanPaletteItem(CardComponent.class));
             group.addPaletteItem(new JavaBeanPaletteItem(PaginationComponent.class));
             group.addPaletteItem(new JavaBeanPaletteItem(ExpandableSearchBoxComponent.class));
+            group.addPaletteItem(new JavaBeanPaletteItem(MessageLogCardComponent.class));
         }
     }
 }
