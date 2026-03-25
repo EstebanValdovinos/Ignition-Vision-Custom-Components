@@ -12,6 +12,7 @@ import com.inductiveautomation.ignition.examples.ce.components.display.Thermomet
 import com.inductiveautomation.ignition.examples.ce.components.display.PieDonutChartComponent;
 import com.inductiveautomation.ignition.examples.ce.components.display.CardComponent;
 import com.inductiveautomation.ignition.examples.ce.components.display.MessageLogCardComponent;
+import com.inductiveautomation.ignition.examples.ce.components.display.LineChartComponent;
 import com.inductiveautomation.ignition.examples.ce.components.input.SegmentedControlComponent;
 import com.inductiveautomation.ignition.examples.ce.components.input.DropdownButtonComponent;
 import com.inductiveautomation.ignition.examples.ce.components.input.DateRangePickerComponent;
@@ -60,6 +61,7 @@ public class MyModuleDesignerHook extends AbstractDesignerModuleHook {
             group.addPaletteItem(new JavaBeanPaletteItem(PaginationComponent.class));
             group.addPaletteItem(new JavaBeanPaletteItem(ExpandableSearchBoxComponent.class));
             group.addPaletteItem(new JavaBeanPaletteItem(MessageLogCardComponent.class));
+            group.addPaletteItem(new JavaBeanPaletteItem(LineChartComponent.class));
         }
     }
 }
