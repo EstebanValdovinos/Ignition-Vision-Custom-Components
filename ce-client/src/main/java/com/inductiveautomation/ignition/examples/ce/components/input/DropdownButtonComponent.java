@@ -906,28 +906,25 @@ public class DropdownButtonComponent extends JComponent
     }
 
     private void paintHeaderArrow(Graphics2D g2, int w, int h, Color color) {
-        int arrowX = w - 20;
-        int arrowY = h / 2;
-        int arrowSize = 4;
+        int cx = w - 20;
+        int cy = h / 2;
+        int size = 8;
 
-        Polygon poly;
-        g2.setColor(color);
+        Graphics2D g = (Graphics2D) g2.create();
+        try {
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setColor(color);
+            g.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
 
-        if (open) {
-            poly = new Polygon(
-                    new int[]{arrowX, arrowX + arrowSize, arrowX - arrowSize},
-                    new int[]{arrowY - 2, arrowY + 3, arrowY + 3},
-                    3
-            );
-        } else {
-            poly = new Polygon(
-                    new int[]{arrowX, arrowX + arrowSize, arrowX - arrowSize},
-                    new int[]{arrowY + 3, arrowY - 2, arrowY - 2},
-                    3
-            );
+            if (open) {
+                g.rotate(Math.PI, cx, cy);
+            }
+
+            g.drawLine(cx - size / 2, cy - 1, cx, cy + size / 3);
+            g.drawLine(cx, cy + size / 3, cx + size / 2, cy - 1);
+        } finally {
+            g.dispose();
         }
-
-        g2.fill(poly);
     }
 
     private int getHeaderArrowCenterXLocal() {
