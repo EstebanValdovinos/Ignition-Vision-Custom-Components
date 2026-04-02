@@ -1,8 +1,11 @@
 package com.inductiveautomation.ignition.examples.ce.components.input;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.image.BufferedImage;
+import java.io.InputStream;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.IsoFields;
@@ -27,6 +30,9 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
 
     private static final String[] WEEKDAY_LABELS = {"W", "Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"};
 
+    private static final int CHEVRON_ANIM_DELAY = 15;
+    private static final float CHEVRON_ANIM_STEP = 24f;
+
     private Date startDate = dateFrom(LocalDate.now().atStartOfDay());
     private Date endDate = dateFrom(LocalDate.now().atTime(23, 59));
 
@@ -40,6 +46,11 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
 
     private boolean dark = false;
     private boolean isOpen = false;
+
+    private float chevronRotation = 0f;
+    private final Timer chevronTimer;
+
+    private final Image headerIcon = loadHeaderIcon();
 
     private final JPopupMenu popupMenu;
     private final PopupPanel popupPanel;
@@ -62,6 +73,22 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
 
         popupPanel = new PopupPanel();
         popupMenu.add(popupPanel, BorderLayout.CENTER);
+
+        chevronTimer = new Timer(CHEVRON_ANIM_DELAY, e -> {
+            float target = isOpen ? 180f : 0f;
+
+            if (Math.abs(chevronRotation - target) <= CHEVRON_ANIM_STEP) {
+                chevronRotation = target;
+                ((Timer) e.getSource()).stop();
+            } else if (chevronRotation < target) {
+                chevronRotation += CHEVRON_ANIM_STEP;
+            } else {
+                chevronRotation -= CHEVRON_ANIM_STEP;
+            }
+
+            repaint();
+        });
+        chevronTimer.setRepeats(true);
 
         addMouseListener(this);
     }
@@ -188,7 +215,14 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
         boolean old = this.isOpen;
         this.isOpen = open;
         firePropertyChange("isOpen", old, this.isOpen);
-        repaint();
+
+        if (old != open) {
+            if (!chevronTimer.isRunning()) {
+                chevronTimer.start();
+            }
+        } else {
+            repaint();
+        }
     }
 
     // ---------------------------------------------------------------------
@@ -217,14 +251,33 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
             g2.drawRoundRect(0, 0, w - 1, h - 1, 8, 8);
 
             String text = formatRangeText(startDate, endDate);
-            FontMetrics fm = g2.getFontMetrics(getFont());
-            int textY = (h - fm.getHeight()) / 2 + fm.getAscent();
 
             g2.setFont(getFont());
-            g2.setColor(btnText);
-            g2.drawString(text, 12, textY);
+            FontMetrics fm = g2.getFontMetrics();
 
-            paintChevronDown(g2, w - 14, h / 2, 8, btnText);
+            int leftPadding = 12;
+            int rightPadding = 12;
+            int chevronSpace = 18;
+
+            int iconSize = Math.max(14, Math.min(18, h - 18));
+            int iconX = leftPadding;
+            int iconY = (h - iconSize) / 2;
+
+            int textGap = 8;
+            int textX = iconX + iconSize + textGap;
+            int textY = (h - fm.getHeight()) / 2 + fm.getAscent();
+
+            paintHeaderIcon(g2, iconX, iconY, iconSize, btnText);
+
+            Shape oldClip = g2.getClip();
+            g2.setClip(textX, 0, Math.max(0, w - textX - rightPadding - chevronSpace), h);
+
+            g2.setColor(btnText);
+            g2.drawString(text, textX, textY);
+
+            g2.setClip(oldClip);
+
+            paintAnimatedChevron(g2, w - 14, h / 2, 8, btnText, chevronRotation);
         } finally {
             g2.dispose();
         }
@@ -381,6 +434,16 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
         private boolean draggingStartSlider = false;
         private boolean draggingEndSlider = false;
 
+        private Rectangle startMinusRect = new Rectangle();
+        private Rectangle startPlusRect = new Rectangle();
+        private Rectangle endMinusRect = new Rectangle();
+        private Rectangle endPlusRect = new Rectangle();
+
+        private boolean hoverStartMinus = false;
+        private boolean hoverStartPlus = false;
+        private boolean hoverEndMinus = false;
+        private boolean hoverEndPlus = false;
+
         private int hoverPreset = -1;
         private int hoverWeekLeft = -1;
         private int hoverWeekRight = -1;
@@ -390,7 +453,7 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
         private Rectangle leftPrevRect = new Rectangle();
         private Rectangle rightNextRect = new Rectangle();
 
-        private final List<Rectangle> presetRects = new ArrayList<>();
+        private final List<Rectangle> presetRects = new ArrayList<Rectangle>();
 
         private LocalDate firstClickDate = null;
 
@@ -435,6 +498,10 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
             hoverWeekRight = -1;
             hoverApply = false;
             hoverCancel = false;
+            hoverStartMinus = false;
+            hoverStartPlus = false;
+            hoverEndMinus = false;
+            hoverEndPlus = false;
             draggingStartSlider = false;
             draggingEndSlider = false;
             setCursor(Cursor.getDefaultCursor());
@@ -674,6 +741,9 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
             int sectionGap = 36;
             int sectionW = (w - sectionGap) / 2;
 
+            int buttonSize = 16;
+            int buttonGap = 8;
+
             int startX = x;
             int endX = x + sectionW + sectionGap;
             int sliderY = y + 36;
@@ -683,11 +753,23 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
             g2.drawString("Start Time: " + TIME_LABEL_FORMAT.format(workingStart.toLocalTime()), startX, y + 12);
             g2.drawString("End Time: " + TIME_LABEL_FORMAT.format(workingEnd.toLocalTime()), endX, y + 12);
 
-            startSliderRect.setBounds(startX, sliderY, sectionW - 10, 18);
-            endSliderRect.setBounds(endX, sliderY, sectionW - 10, 18);
+            int sliderWidth = sectionW - ((buttonSize * 2) + (buttonGap * 2)) - 10;
 
+            startMinusRect.setBounds(startX, sliderY - 8, buttonSize, buttonSize);
+            startSliderRect.setBounds(startMinusRect.x + buttonSize + buttonGap, sliderY - 7, sliderWidth, 18);
+            startPlusRect.setBounds(startSliderRect.x + startSliderRect.width + buttonGap, sliderY - 8, buttonSize, buttonSize);
+
+            endMinusRect.setBounds(endX, sliderY - 8, buttonSize, buttonSize);
+            endSliderRect.setBounds(endMinusRect.x + buttonSize + buttonGap, sliderY - 7, sliderWidth, 18);
+            endPlusRect.setBounds(endSliderRect.x + endSliderRect.width + buttonGap, sliderY - 8, buttonSize, buttonSize);
+
+            paintIconButton(g2, startMinusRect, "-", hoverStartMinus, t);
             paintSlider(g2, startSliderRect, workingStart.getHour() * 60 + workingStart.getMinute(), t);
+            paintIconButton(g2, startPlusRect, "+", hoverStartPlus, t);
+
+            paintIconButton(g2, endMinusRect, "-", hoverEndMinus, t);
             paintSlider(g2, endSliderRect, workingEnd.getHour() * 60 + workingEnd.getMinute(), t);
+            paintIconButton(g2, endPlusRect, "+", hoverEndPlus, t);
         }
 
         private void paintSlider(Graphics2D g2, Rectangle r, int minutes, Theme t) {
@@ -695,63 +777,99 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
             int lineX1 = r.x;
             int lineX2 = r.x + r.width;
 
+            g2.setStroke(new BasicStroke(3f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
             g2.setColor(t.sliderTrack);
-            g2.setStroke(new BasicStroke(4f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
             g2.drawLine(lineX1, lineY, lineX2, lineY);
 
-            int knobX = lineX1 + (int) Math.round((minutes / 1439.0) * r.width);
-            knobX = clamp(knobX, lineX1, lineX2);
+            int knobX = r.x + (int) Math.round((minutes / 1439.0) * r.width);
+            knobX = clamp(knobX, r.x, r.x + r.width);
 
             g2.setColor(primaryColor);
-            g2.setStroke(new BasicStroke(3f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
             g2.drawLine(lineX1, lineY, knobX, lineY);
 
+            int outerD = 14;
+            int innerD = 8;
+            int outerX = knobX - outerD / 2;
+            int outerY = lineY - outerD / 2;
+            int innerX = knobX - innerD / 2;
+            int innerY = lineY - innerD / 2;
+
             g2.setColor(t.sliderKnobOuter);
-            g2.fillOval(knobX - 7, lineY - 7, 14, 14);
+            g2.fillOval(outerX, outerY, outerD, outerD);
+
             g2.setColor(t.sliderKnobBorder);
             g2.setStroke(new BasicStroke(1f));
-            g2.drawOval(knobX - 7, lineY - 7, 14, 14);
+            g2.drawOval(outerX, outerY, outerD, outerD);
 
             g2.setColor(primaryColor);
-            g2.fillOval(knobX - 3, lineY - 3, 6, 6);
+            g2.fillOval(innerX, innerY, innerD, innerD);
+        }
+
+        private void paintIconButton(Graphics2D g2, Rectangle r, String text, boolean hover, Theme t) {
+            Graphics2D g = (Graphics2D) g2.create();
+            try {
+                enableQuality(g);
+
+                if (hover) {
+                    g.setColor(t.hoverSoft);
+                    g.fillOval(r.x, r.y, r.width, r.height);
+                }
+
+                g.setFont(getFont().deriveFont(Font.BOLD, 14f));
+                g.setColor(t.textStrong);
+
+                FontMetrics fm = g.getFontMetrics();
+                int tx = r.x + (r.width - fm.stringWidth(text)) / 2;
+                int ty = r.y + (r.height - fm.getHeight()) / 2 + fm.getAscent();
+
+                g.drawString(text, tx, ty);
+            } finally {
+                g.dispose();
+            }
         }
 
         private void paintFooter(Graphics2D g2, int x, int y, int w, int h, Theme t) {
-            String footerText = "Start: " + FOOTER_FORMAT.format(workingStart) + " | End: " + FOOTER_FORMAT.format(workingEnd);
-            g2.setFont(getFont().deriveFont(Font.PLAIN, 13f));
-            g2.setColor(t.text);
-            g2.drawString(footerText, x + 26, y + 31);
+            int pad = 12;
 
-            int btnW = 68;
+            String startTxt = FOOTER_FORMAT.format(workingStart);
+            String endTxt = FOOTER_FORMAT.format(workingEnd);
+
+            g2.setFont(getFont().deriveFont(Font.PLAIN, 11f));
+            g2.setColor(t.textMuted);
+            g2.drawString(startTxt, x + pad, y + 17);
+            g2.drawString(endTxt, x + pad, y + 35);
+
             int btnH = 30;
-            int gap = 12;
+            int btnW = 74;
+            int gap = 10;
 
-            applyRect.setBounds(x + w - btnW - 16, y + 10, btnW, btnH);
-            cancelRect.setBounds(applyRect.x - btnW - gap, y + 10, btnW, btnH);
+            int applyX = x + w - pad - btnW;
+            int cancelX = applyX - gap - btnW;
+            int btnY = y + (h - btnH) / 2;
 
-            g2.setFont(getFont().deriveFont(Font.BOLD, 13f));
-
-            Color applyBg = hoverApply ? mix(primaryColor, Color.WHITE, 0.10f) : primaryColor;
-            Color applyBorder = hoverApply ? mix(primaryColor, Color.BLACK, 0.10f) : primaryColor;
-
-            g2.setColor(applyBg);
-            g2.fillRoundRect(applyRect.x, applyRect.y, applyRect.width, applyRect.height, 4, 4);
-            g2.setColor(applyBorder);
-            g2.drawRoundRect(applyRect.x, applyRect.y, applyRect.width, applyRect.height, 4, 4);
-            g2.setColor(Color.WHITE);
-            drawCenteredString(g2, "Apply", applyRect.x + applyRect.width / 2, applyRect.y + 20);
+            cancelRect.setBounds(cancelX, btnY, btnW, btnH);
+            applyRect.setBounds(applyX, btnY, btnW, btnH);
 
             if (hoverCancel) {
                 g2.setColor(t.cancelHoverBg);
-                g2.fillRoundRect(cancelRect.x, cancelRect.y, cancelRect.width, cancelRect.height, 4, 4);
+                g2.fillRoundRect(cancelRect.x, cancelRect.y, cancelRect.width, cancelRect.height, 6, 6);
             }
             g2.setColor(t.cancelText);
-            drawCenteredString(g2, "Cancel", cancelRect.x + cancelRect.width / 2, cancelRect.y + 20);
+            g2.setFont(getFont().deriveFont(Font.BOLD, 12f));
+            drawCenteredString(g2, "Cancel", cancelRect.x + cancelRect.width / 2, cancelRect.y + 19);
+
+            g2.setColor(primaryColor);
+            g2.fillRoundRect(applyRect.x, applyRect.y, applyRect.width, applyRect.height, 6, 6);
+            g2.setColor(Color.WHITE);
+            drawCenteredString(g2, "Apply", applyRect.x + applyRect.width / 2, applyRect.y + 19);
         }
 
         private boolean isPresetActive(int index) {
             LocalDateTime[] range = getPresetRange(index);
-            return range[0].equals(workingStart) && range[1].equals(workingEnd);
+            return workingStart.toLocalDate().equals(range[0].toLocalDate())
+                    && workingEnd.toLocalDate().equals(range[1].toLocalDate())
+                    && workingStart.toLocalTime().equals(range[0].toLocalTime())
+                    && workingEnd.toLocalTime().equals(range[1].toLocalTime());
         }
 
         private LocalDateTime[] getPresetRange(int index) {
@@ -806,7 +924,7 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
         }
 
         private List<LocalDate> getVisibleWeekStarts(YearMonth month) {
-            List<LocalDate> rows = new ArrayList<>();
+            List<LocalDate> rows = new ArrayList<LocalDate>();
             LocalDate firstOfMonth = month.atDay(1);
             LocalDate gridStart = firstOfMonth.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
 
@@ -932,9 +1050,43 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
             return (int) Math.round(ratio * 1439.0);
         }
 
+        private void adjustStartMinutes(int delta) {
+            int current = workingStart.getHour() * 60 + workingStart.getMinute();
+            int updated = clamp(current + delta, 0, 1439);
+            workingStart = workingStart.withHour(updated / 60).withMinute(updated % 60);
+            repaint();
+        }
+
+        private void adjustEndMinutes(int delta) {
+            int current = workingEnd.getHour() * 60 + workingEnd.getMinute();
+            int updated = clamp(current + delta, 0, 1439);
+            workingEnd = workingEnd.withHour(updated / 60).withMinute(updated % 60);
+            repaint();
+        }
+
         @Override
         public void mouseClicked(MouseEvent e) {
             Point p = e.getPoint();
+
+            if (startMinusRect.contains(p)) {
+                adjustStartMinutes(-1);
+                return;
+            }
+
+            if (startPlusRect.contains(p)) {
+                adjustStartMinutes(1);
+                return;
+            }
+
+            if (endMinusRect.contains(p)) {
+                adjustEndMinutes(-1);
+                return;
+            }
+
+            if (endPlusRect.contains(p)) {
+                adjustEndMinutes(1);
+                return;
+            }
 
             if (applyRect.contains(p)) {
                 applyWorkingValues();
@@ -1052,6 +1204,11 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
             hoverApply = applyRect.contains(p);
             hoverCancel = cancelRect.contains(p);
 
+            hoverStartMinus = startMinusRect.contains(p);
+            hoverStartPlus = startPlusRect.contains(p);
+            hoverEndMinus = endMinusRect.contains(p);
+            hoverEndPlus = endPlusRect.contains(p);
+
             boolean hand =
                     hoverApply ||
                             hoverCancel ||
@@ -1062,7 +1219,11 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
                             leftPrevRect.contains(p) ||
                             rightNextRect.contains(p) ||
                             startSliderRect.contains(p) ||
-                            endSliderRect.contains(p);
+                            endSliderRect.contains(p) ||
+                            hoverStartMinus ||
+                            hoverStartPlus ||
+                            hoverEndMinus ||
+                            hoverEndPlus;
 
             setCursor(Cursor.getPredefinedCursor(hand ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
             repaint();
@@ -1076,6 +1237,10 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
             hoverWeekRight = -1;
             hoverApply = false;
             hoverCancel = false;
+            hoverStartMinus = false;
+            hoverStartPlus = false;
+            hoverEndMinus = false;
+            hoverEndPlus = false;
             setCursor(Cursor.getDefaultCursor());
             repaint();
         }
@@ -1167,6 +1332,54 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
     // Helpers
     // ---------------------------------------------------------------------
 
+    private Image loadHeaderIcon() {
+        try {
+            InputStream is = DateRangePickerComponent.class.getResourceAsStream("/images/daterange_picker_icon.png");
+            if (is != null) {
+                try {
+                    BufferedImage img = ImageIO.read(is);
+                    if (img != null) {
+                        return img;
+                    }
+                } finally {
+                    is.close();
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    private void paintHeaderIcon(Graphics2D g2, int x, int y, int size, Color tint) {
+        if (headerIcon == null || size <= 0) {
+            return;
+        }
+
+        BufferedImage tinted = tintImage(headerIcon, tint != null ? tint : getHeaderTextColor(), size, size);
+        if (tinted != null) {
+            g2.drawImage(tinted, x, y, null);
+        }
+    }
+
+    private BufferedImage tintImage(Image image, Color tint, int width, int height) {
+        if (image == null || width <= 0 || height <= 0) {
+            return null;
+        }
+
+        BufferedImage src = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = src.createGraphics();
+        try {
+            enableQuality(g2);
+            g2.drawImage(image, 0, 0, width, height, null);
+            g2.setComposite(AlphaComposite.SrcIn);
+            g2.setColor(tint != null ? tint : Color.GRAY);
+            g2.fillRect(0, 0, width, height);
+        } finally {
+            g2.dispose();
+        }
+        return src;
+    }
+
     private static void enableQuality(Graphics2D g2) {
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
@@ -1179,11 +1392,18 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
         g2.drawString(text, x, baselineY);
     }
 
-    private static void paintChevronDown(Graphics2D g2, int cx, int cy, int size, Color color) {
-        g2.setColor(color);
-        g2.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-        g2.drawLine(cx - size / 2, cy - 1, cx, cy + size / 3);
-        g2.drawLine(cx, cy + size / 3, cx + size / 2, cy - 1);
+    private static void paintAnimatedChevron(Graphics2D g2, int cx, int cy, int size, Color color, float rotationDeg) {
+        Graphics2D g = (Graphics2D) g2.create();
+        try {
+            g.translate(cx, cy);
+            g.rotate(Math.toRadians(rotationDeg));
+            g.setColor(color);
+            g.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            g.drawLine(-size / 2, -1, 0, size / 3);
+            g.drawLine(0, size / 3, size / 2, -1);
+        } finally {
+            g.dispose();
+        }
     }
 
     private static void paintChevronLeft(Graphics2D g2, int cx, int cy, int size, Color color) {
