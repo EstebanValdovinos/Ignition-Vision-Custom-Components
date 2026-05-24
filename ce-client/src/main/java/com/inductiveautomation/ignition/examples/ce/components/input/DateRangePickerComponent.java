@@ -8,13 +8,16 @@ import java.awt.image.BufferedImage;
 import java.io.InputStream;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.IsoFields;
 import java.time.temporal.TemporalAdjusters;
+import java.time.temporal.WeekFields;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
 public class DateRangePickerComponent extends JComponent implements MouseListener {
+
+    public static final int WEEK_START_SUNDAY = 0;
+    public static final int WEEK_START_MONDAY = 1;
 
     private static final DateTimeFormatter BUTTON_FORMAT =
             DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm");
@@ -28,7 +31,6 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
     private static final DateTimeFormatter TIME_LABEL_FORMAT =
             DateTimeFormatter.ofPattern("HH:mm");
 
-    private static final String[] WEEKDAY_LABELS = {"W", "Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"};
 
     private static final int CHEVRON_ANIM_DELAY = 15;
     private static final float CHEVRON_ANIM_STEP = 24f;
@@ -46,6 +48,8 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
 
     private boolean dark = false;
     private boolean isOpen = false;
+    private int weekStartDay = WEEK_START_SUNDAY;
+    private boolean productionDayTimes = false;
 
     private float chevronRotation = 0f;
     private final Timer chevronTimer;
@@ -225,6 +229,43 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
         }
     }
 
+    public int getWeekStartDay() {
+        return weekStartDay;
+    }
+
+    public void setWeekStartDay(int weekStartDay) {
+        int old = this.weekStartDay;
+        int newValue = (weekStartDay == WEEK_START_MONDAY) ? WEEK_START_MONDAY : WEEK_START_SUNDAY;
+        if (old == newValue) {
+            return;
+        }
+
+        this.weekStartDay = newValue;
+        firePropertyChange("weekStartDay", old, this.weekStartDay);
+
+        if (popupPanel != null) {
+            popupPanel.revalidateTimeFields();
+            popupPanel.repaint();
+        }
+        repaint();
+    }
+
+
+    public boolean isProductionDayTimes() {
+        return productionDayTimes;
+    }
+
+    public void setProductionDayTimes(boolean productionDayTimes) {
+        boolean old = this.productionDayTimes;
+        this.productionDayTimes = productionDayTimes;
+        firePropertyChange("productionDayTimes", old, this.productionDayTimes);
+        if (popupPanel != null) {
+            popupPanel.revalidateTimeFields();
+            popupPanel.repaint();
+        }
+        repaint();
+    }
+
     // ---------------------------------------------------------------------
     // Paint button
     // ---------------------------------------------------------------------
@@ -400,14 +441,14 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
 
     private class PopupPanel extends JPanel implements MouseListener, MouseMotionListener {
 
-        private final int popupW = 728;
-        private final int popupH = 398;
+        private final int popupW = 790;
+        private final int popupH = 460;
 
         private final int panelRadius = 8;
 
-        private final int presetPanelW = 120;
+        private final int presetPanelW = 168;
         private final int footerH = 52;
-        private final int sliderAreaH = 86;
+        private final int sliderAreaH = 112;
         private final int monthHeaderH = 28;
         private final int weekHeaderH = 22;
         private final int cellH = 34;
@@ -438,11 +479,17 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
         private Rectangle startPlusRect = new Rectangle();
         private Rectangle endMinusRect = new Rectangle();
         private Rectangle endPlusRect = new Rectangle();
+        private Rectangle productionToggleRect = new Rectangle();
+
+        private final JTextField startTimeField = new JTextField();
+        private final JTextField endTimeField = new JTextField();
+        private boolean syncingTimeFields = false;
 
         private boolean hoverStartMinus = false;
         private boolean hoverStartPlus = false;
         private boolean hoverEndMinus = false;
         private boolean hoverEndPlus = false;
+        private boolean hoverProductionToggle = false;
 
         private int hoverPreset = -1;
         private int hoverWeekLeft = -1;
@@ -458,11 +505,19 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
         private LocalDate firstClickDate = null;
 
         private final String[] presets = {
+                "This Shift",
+                "Previous Shift",
                 "Today",
                 "Yesterday",
+                "This Week",
+                "Previous Week",
                 "Last 7 Days",
                 "Last 15 Days",
                 "Last 30 Days",
+                "This Month",
+                "Previous Month",
+                "This Quarter",
+                "Previous Quarter",
                 "Last 6 Months",
                 "Last 1 Year"
         };
@@ -470,7 +525,12 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
         PopupPanel() {
             setOpaque(false);
             setBorder(null);
+            setLayout(null);
             setPreferredSize(new Dimension(popupW, popupH));
+            configureTimeField(startTimeField, true);
+            configureTimeField(endTimeField, false);
+            add(startTimeField);
+            add(endTimeField);
             addMouseListener(this);
             addMouseMotionListener(this);
         }
@@ -502,9 +562,11 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
             hoverStartPlus = false;
             hoverEndMinus = false;
             hoverEndPlus = false;
+            hoverProductionToggle = false;
             draggingStartSlider = false;
             draggingEndSlider = false;
             setCursor(Cursor.getDefaultCursor());
+            syncTimeFields();
 
             repaint();
         }
@@ -536,7 +598,7 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
                 g2.drawLine(panelX + presetPanelW, panelY + 16, panelX + presetPanelW, contentBottom - 1);
                 g2.drawLine(panelX, contentBottom, panelX + panelW, contentBottom);
 
-                paintPresets(g2, panelX + 10, panelY + 18, presetPanelW - 20, contentBottom - panelY - 24, t);
+                paintPresets(g2, panelX + 10, panelY + 14, presetPanelW - 20, contentBottom - panelY - 20, t);
                 paintMonths(g2, panelX + presetPanelW + 12, panelY + 12, panelW - presetPanelW - 24, contentBottom - panelY - sliderAreaH - 18, t);
                 paintSliders(g2, panelX + presetPanelW + 18, contentBottom - sliderAreaH + 10, panelW - presetPanelW - 36, sliderAreaH - 10, t);
                 paintFooter(g2, panelX, panelY + panelH - footerH, panelW, footerH, t);
@@ -548,13 +610,19 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
         private void paintPresets(Graphics2D g2, int x, int y, int w, int h, Theme t) {
             presetRects.clear();
 
+            int toggleH = 22;
+            productionToggleRect.setBounds(x + 2, y, w - 4, toggleH);
+            paintProductionToggle(g2, productionToggleRect, t);
+
             Font normal = getFont().deriveFont(Font.PLAIN, 11f);
             Font hoverFont = normal.deriveFont(Font.BOLD);
 
-            int rowH = 34;
+            int topGap = 36;
+            int rowH = 24;
+            int itemH = 20;
             for (int i = 0; i < presets.length; i++) {
-                int ry = y + i * rowH;
-                Rectangle r = new Rectangle(x, ry, w, 26);
+                int ry = y + topGap + i * rowH;
+                Rectangle r = new Rectangle(x, ry, w, itemH);
                 presetRects.add(r);
 
                 boolean active = isPresetActive(i);
@@ -622,14 +690,15 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
             int weekHeaderY = gridY + monthHeaderH;
             g2.setFont(weekFont);
             g2.setColor(t.textMuted);
-            for (int i = 0; i < WEEKDAY_LABELS.length; i++) {
+            String[] weekdayLabels = getWeekdayLabels();
+            for (int i = 0; i < weekdayLabels.length; i++) {
                 int cx;
                 if (i == 0) {
                     cx = gridX + weekColW / 2;
                 } else {
                     cx = gridX + weekColW + (i - 1) * dayColW + dayColW / 2;
                 }
-                drawCenteredString(g2, WEEKDAY_LABELS[i], cx, weekHeaderY + 14);
+                drawCenteredString(g2, weekdayLabels[i], cx, weekHeaderY + 14);
             }
 
             List<LocalDate> weekStarts = getVisibleWeekStarts(month);
@@ -642,7 +711,7 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
                 LocalDate weekStart = weekStarts.get(visibleRow);
                 int rowY = startY + visibleRow * cellH;
 
-                int weekNum = weekStart.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
+                int weekNum = weekStart.get(WeekFields.of(getFirstDayOfWeek(), 1).weekOfWeekBasedYear());
                 Rectangle weekRect = new Rectangle(gridX, rowY, weekColW, cellH);
                 boolean hoverWeek = left ? (hoverWeekLeft == visibleRow) : (hoverWeekRight == visibleRow);
 
@@ -746,12 +815,24 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
 
             int startX = x;
             int endX = x + sectionW + sectionGap;
-            int sliderY = y + 36;
+            int inputY = y + 4;
+            int sliderY = y + 60;
 
-            g2.setFont(getFont().deriveFont(Font.BOLD, 13f));
+            g2.setFont(getFont().deriveFont(Font.BOLD, 12f));
             g2.setColor(t.textStrong);
-            g2.drawString("Start Time: " + TIME_LABEL_FORMAT.format(workingStart.toLocalTime()), startX, y + 12);
-            g2.drawString("End Time: " + TIME_LABEL_FORMAT.format(workingEnd.toLocalTime()), endX, y + 12);
+            g2.drawString("Start Time", startX, y + 18);
+            g2.drawString("End Time", endX, y + 18);
+
+            int fieldW = 58;
+            int fieldH = 24;
+            startTimeField.setBounds(startX + 78, inputY, fieldW, fieldH);
+            endTimeField.setBounds(endX + 68, inputY, fieldW, fieldH);
+            styleTimeField(startTimeField, t);
+            styleTimeField(endTimeField, t);
+            if (!startTimeField.isFocusOwner() && !endTimeField.isFocusOwner()) {
+                syncTimeFields();
+            }
+
 
             int sliderWidth = sectionW - ((buttonSize * 2) + (buttonGap * 2)) - 10;
 
@@ -770,6 +851,35 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
             paintIconButton(g2, endMinusRect, "-", hoverEndMinus, t);
             paintSlider(g2, endSliderRect, workingEnd.getHour() * 60 + workingEnd.getMinute(), t);
             paintIconButton(g2, endPlusRect, "+", hoverEndPlus, t);
+        }
+
+        private void paintProductionToggle(Graphics2D g2, Rectangle r, Theme t) {
+            boolean active = DateRangePickerComponent.this.isProductionDayTimes();
+
+            int trackW = 34;
+            int trackH = 16;
+            int trackX = r.x + 2;
+            int trackY = r.y + (r.height - trackH) / 2;
+
+            if (hoverProductionToggle && !active) {
+                g2.setColor(withAlpha(primaryColor, dark ? 36 : 18));
+                g2.fillRoundRect(trackX - 2, trackY - 2, trackW + 4, trackH + 4, 10, 10);
+            }
+
+            g2.setColor(active ? primaryColor : t.sliderTrack);
+            g2.fillRoundRect(trackX, trackY, trackW, trackH, 8, 8);
+
+            int knobD = 12;
+            int knobX = active ? trackX + trackW - knobD - 2 : trackX + 2;
+            int knobY = trackY + 2;
+            g2.setColor(t.sliderKnobOuter);
+            g2.fillOval(knobX, knobY, knobD, knobD);
+
+            g2.setFont(getFont().deriveFont(Font.BOLD, 11f));
+            g2.setColor(active ? primaryColor : t.textMutedStrong);
+            FontMetrics fm = g2.getFontMetrics();
+            int ty = r.y + (r.height - fm.getHeight()) / 2 + fm.getAscent();
+            g2.drawString("Production Day", trackX + trackW + 8, ty);
         }
 
         private void paintSlider(Graphics2D g2, Rectangle r, int minutes, Theme t) {
@@ -877,22 +987,96 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
 
             switch (index) {
                 case 0:
-                    return new LocalDateTime[]{today.atStartOfDay(), today.atTime(23, 59)};
-                case 1: {
-                    LocalDate d = today.minusDays(1);
-                    return new LocalDateTime[]{d.atStartOfDay(), d.atTime(23, 59)};
-                }
+                    return getShiftRange(0);
+                case 1:
+                    return getShiftRange(-1);
                 case 2:
-                    return new LocalDateTime[]{today.minusDays(6).atStartOfDay(), today.atTime(23, 59)};
-                case 3:
-                    return new LocalDateTime[]{today.minusDays(14).atStartOfDay(), today.atTime(23, 59)};
-                case 4:
-                    return new LocalDateTime[]{today.minusDays(29).atStartOfDay(), today.atTime(23, 59)};
-                case 5:
-                    return new LocalDateTime[]{today.minusMonths(6).atStartOfDay(), today.atTime(23, 59)};
+                    return rangeForWholeDays(today, today);
+                case 3: {
+                    LocalDate d = today.minusDays(1);
+                    return rangeForWholeDays(d, d);
+                }
+                case 4: {
+                    LocalDate weekStart = today.with(TemporalAdjusters.previousOrSame(getFirstDayOfWeek()));
+                    return rangeForWholeDays(weekStart, weekStart.plusDays(6));
+                }
+                case 5: {
+                    LocalDate weekStart = today.with(TemporalAdjusters.previousOrSame(getFirstDayOfWeek())).minusWeeks(1);
+                    return rangeForWholeDays(weekStart, weekStart.plusDays(6));
+                }
+                case 6:
+                    return rangeForWholeDays(today.minusDays(6), today);
+                case 7:
+                    return rangeForWholeDays(today.minusDays(14), today);
+                case 8:
+                    return rangeForWholeDays(today.minusDays(29), today);
+                case 9: {
+                    LocalDate monthStart = today.withDayOfMonth(1);
+                    return rangeForWholeDays(monthStart, monthStart.with(TemporalAdjusters.lastDayOfMonth()));
+                }
+                case 10: {
+                    LocalDate monthStart = today.withDayOfMonth(1).minusMonths(1);
+                    return rangeForWholeDays(monthStart, monthStart.with(TemporalAdjusters.lastDayOfMonth()));
+                }
+                case 11: {
+                    LocalDate quarterStart = getQuarterStart(today);
+                    return rangeForWholeDays(quarterStart, quarterStart.plusMonths(3).minusDays(1));
+                }
+                case 12: {
+                    LocalDate quarterStart = getQuarterStart(today).minusMonths(3);
+                    return rangeForWholeDays(quarterStart, quarterStart.plusMonths(3).minusDays(1));
+                }
+                case 13:
+                    return rangeForWholeDays(today.minusMonths(6), today);
+                case 14:
+                    return rangeForWholeDays(today.minusYears(1), today);
                 default:
-                    return new LocalDateTime[]{today.minusYears(1).atStartOfDay(), today.atTime(23, 59)};
+                    return rangeForWholeDays(today, today);
             }
+        }
+
+        private LocalDateTime[] getShiftRange(int offset) {
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime currentStart;
+            LocalDateTime currentEnd;
+            LocalTime time = now.toLocalTime();
+
+            if (!time.isBefore(LocalTime.of(5, 0)) && time.isBefore(LocalTime.of(17, 0))) {
+                currentStart = now.toLocalDate().atTime(5, 0);
+                currentEnd = now.toLocalDate().atTime(17, 0);
+            } else if (!time.isBefore(LocalTime.of(17, 0))) {
+                currentStart = now.toLocalDate().atTime(17, 0);
+                currentEnd = now.toLocalDate().plusDays(1).atTime(5, 0);
+            } else {
+                currentStart = now.toLocalDate().minusDays(1).atTime(17, 0);
+                currentEnd = now.toLocalDate().atTime(5, 0);
+            }
+
+            if (offset < 0) {
+                for (int i = 0; i < Math.abs(offset); i++) {
+                    currentEnd = currentStart;
+                    currentStart = currentStart.minusHours(12);
+                }
+            } else if (offset > 0) {
+                for (int i = 0; i < offset; i++) {
+                    currentStart = currentEnd;
+                    currentEnd = currentEnd.plusHours(12);
+                }
+            }
+
+            return new LocalDateTime[]{currentStart, currentEnd};
+        }
+
+        private LocalDateTime[] rangeForWholeDays(LocalDate start, LocalDate end) {
+            if (DateRangePickerComponent.this.isProductionDayTimes()) {
+                return new LocalDateTime[]{start.atTime(5, 0), end.plusDays(1).atTime(5, 0)};
+            }
+            return new LocalDateTime[]{start.atStartOfDay(), end.atTime(23, 59)};
+        }
+
+        private LocalDate getQuarterStart(LocalDate date) {
+            int firstMonth = ((date.getMonthValue() - 1) / 3) * 3 + 1;
+            return LocalDate.of(date.getYear(), firstMonth, 1);
         }
 
         private void applyPreset(int index) {
@@ -901,6 +1085,7 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
             workingEnd = range[1];
             leftMonth = YearMonth.from(workingStart.toLocalDate());
             firstClickDate = null;
+            syncTimeFields();
             repaint();
         }
 
@@ -926,7 +1111,7 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
         private List<LocalDate> getVisibleWeekStarts(YearMonth month) {
             List<LocalDate> rows = new ArrayList<LocalDate>();
             LocalDate firstOfMonth = month.atDay(1);
-            LocalDate gridStart = firstOfMonth.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
+            LocalDate gridStart = firstOfMonth.with(TemporalAdjusters.previousOrSame(getFirstDayOfWeek()));
 
             for (int i = 0; i < 6; i++) {
                 LocalDate weekStart = gridStart.plusDays(i * 7L);
@@ -1001,8 +1186,9 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
 
             if (firstClickDate == null) {
                 firstClickDate = clicked;
-                workingStart = clicked.atStartOfDay();
-                workingEnd = clicked.atTime(23, 59);
+                LocalDateTime[] range = rangeForWholeDays(clicked, clicked);
+                workingStart = range[0];
+                workingEnd = range[1];
             } else {
                 LocalDate a = firstClickDate;
                 LocalDate b = clicked;
@@ -1013,11 +1199,13 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
                     b = tmp;
                 }
 
-                workingStart = a.atStartOfDay();
-                workingEnd = b.atTime(23, 59);
+                LocalDateTime[] range = rangeForWholeDays(a, b);
+                workingStart = range[0];
+                workingEnd = range[1];
                 firstClickDate = null;
             }
 
+            syncTimeFields();
             repaint();
         }
 
@@ -1026,20 +1214,26 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
             LocalDate weekStart = weekStarts.get(visibleRow);
             LocalDate weekEnd = weekStart.plusDays(6);
 
-            workingStart = weekStart.atStartOfDay();
-            workingEnd = weekEnd.atTime(23, 59);
+            LocalDateTime[] range = rangeForWholeDays(weekStart, weekEnd);
+            workingStart = range[0];
+            workingEnd = range[1];
             firstClickDate = null;
+            syncTimeFields();
             repaint();
         }
 
         private void updateSlider(MouseEvent e) {
             if (draggingStartSlider) {
                 int mins = sliderMinutesFromX(startSliderRect, e.getX());
+                setManualTimeMode();
                 workingStart = workingStart.withHour(mins / 60).withMinute(mins % 60);
+                syncTimeFields();
                 repaint();
             } else if (draggingEndSlider) {
                 int mins = sliderMinutesFromX(endSliderRect, e.getX());
+                setManualTimeMode();
                 workingEnd = workingEnd.withHour(mins / 60).withMinute(mins % 60);
+                syncTimeFields();
                 repaint();
             }
         }
@@ -1053,15 +1247,148 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
         private void adjustStartMinutes(int delta) {
             int current = workingStart.getHour() * 60 + workingStart.getMinute();
             int updated = clamp(current + delta, 0, 1439);
+            setManualTimeMode();
             workingStart = workingStart.withHour(updated / 60).withMinute(updated % 60);
+            syncTimeFields();
             repaint();
         }
 
         private void adjustEndMinutes(int delta) {
             int current = workingEnd.getHour() * 60 + workingEnd.getMinute();
             int updated = clamp(current + delta, 0, 1439);
+            setManualTimeMode();
             workingEnd = workingEnd.withHour(updated / 60).withMinute(updated % 60);
+            syncTimeFields();
             repaint();
+        }
+
+        private void configureTimeField(final JTextField field, final boolean startField) {
+            field.setHorizontalAlignment(JTextField.CENTER);
+            field.setColumns(5);
+            field.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(new Color(185, 185, 185)),
+                    BorderFactory.createEmptyBorder(1, 4, 1, 4)
+            ));
+            field.addActionListener(e -> commitTimeField(field, startField));
+            field.addFocusListener(new FocusAdapter() {
+                @Override
+                public void focusLost(FocusEvent e) {
+                    commitTimeField(field, startField);
+                }
+            });
+        }
+
+        private void styleTimeField(JTextField field, Theme t) {
+            field.setFont(getFont().deriveFont(Font.PLAIN, 12f));
+            field.setForeground(t.textStrong);
+            field.setBackground(dark ? new Color(44, 47, 53) : Color.WHITE);
+            field.setCaretColor(t.textStrong);
+            field.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(t.sliderKnobBorder),
+                    BorderFactory.createEmptyBorder(1, 4, 1, 4)
+            ));
+        }
+
+        void revalidateTimeFields() {
+            syncTimeFields();
+        }
+
+        private void syncTimeFields() {
+            if (workingStart == null || workingEnd == null) {
+                return;
+            }
+            syncingTimeFields = true;
+            startTimeField.setText(TIME_LABEL_FORMAT.format(workingStart.toLocalTime()));
+            endTimeField.setText(TIME_LABEL_FORMAT.format(workingEnd.toLocalTime()));
+            syncingTimeFields = false;
+        }
+
+        private void commitTimeField(JTextField field, boolean startField) {
+            if (syncingTimeFields || workingStart == null || workingEnd == null) {
+                return;
+            }
+
+            LocalTime parsed = parseManualTime(field.getText());
+            if (parsed == null) {
+                syncTimeFields();
+                return;
+            }
+
+            setManualTimeMode();
+            if (startField) {
+                workingStart = workingStart.withHour(parsed.getHour()).withMinute(parsed.getMinute());
+            } else {
+                workingEnd = workingEnd.withHour(parsed.getHour()).withMinute(parsed.getMinute());
+            }
+            syncTimeFields();
+            repaint();
+        }
+
+        private LocalTime parseManualTime(String text) {
+            if (text == null) {
+                return null;
+            }
+            String value = text.trim();
+            try {
+                if (value.matches("\\d{1,2}:\\d{1,2}")) {
+                    String[] parts = value.split(":");
+                    int hour = Integer.parseInt(parts[0]);
+                    int minute = Integer.parseInt(parts[1]);
+                    if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
+                        return LocalTime.of(hour, minute);
+                    }
+                } else if (value.matches("\\d{3,4}")) {
+                    int split = value.length() - 2;
+                    int hour = Integer.parseInt(value.substring(0, split));
+                    int minute = Integer.parseInt(value.substring(split));
+                    if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
+                        return LocalTime.of(hour, minute);
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+            return null;
+        }
+
+        private void setManualTimeMode() {
+            if (DateRangePickerComponent.this.isProductionDayTimes()) {
+                DateRangePickerComponent.this.setProductionDayTimes(false);
+            }
+        }
+
+        private void toggleProductionDayTimes() {
+            boolean newValue = !DateRangePickerComponent.this.isProductionDayTimes();
+            DateRangePickerComponent.this.setProductionDayTimes(newValue);
+            if (newValue) {
+                LocalDate start = workingStart.toLocalDate();
+                LocalDate end = workingEnd.toLocalDate();
+                if (workingEnd.toLocalTime().equals(LocalTime.of(5, 0)) && workingEnd.toLocalDate().isAfter(start)) {
+                    end = workingEnd.toLocalDate().minusDays(1);
+                }
+                LocalDateTime[] range = rangeForWholeDays(start, end);
+                workingStart = range[0];
+                workingEnd = range[1];
+                syncTimeFields();
+            }
+            repaint();
+        }
+
+        private DayOfWeek getFirstDayOfWeek() {
+            return DateRangePickerComponent.this.getWeekStartDay() == WEEK_START_MONDAY
+                    ? DayOfWeek.MONDAY
+                    : DayOfWeek.SUNDAY;
+        }
+
+        private String[] getWeekdayLabels() {
+            String[] labels = new String[8];
+            labels[0] = "W";
+            String[] names = {"Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"};
+            DayOfWeek first = getFirstDayOfWeek();
+            for (int i = 0; i < 7; i++) {
+                DayOfWeek day = first.plus(i);
+                labels[i + 1] = names[day.getValue() - 1];
+            }
+            return labels;
         }
 
         @Override
@@ -1085,6 +1412,11 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
 
             if (endPlusRect.contains(p)) {
                 adjustEndMinutes(1);
+                return;
+            }
+
+            if (productionToggleRect.contains(p)) {
+                toggleProductionDayTimes();
                 return;
             }
 
@@ -1208,6 +1540,7 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
             hoverStartPlus = startPlusRect.contains(p);
             hoverEndMinus = endMinusRect.contains(p);
             hoverEndPlus = endPlusRect.contains(p);
+            hoverProductionToggle = productionToggleRect.contains(p);
 
             boolean hand =
                     hoverApply ||
@@ -1223,7 +1556,8 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
                             hoverStartMinus ||
                             hoverStartPlus ||
                             hoverEndMinus ||
-                            hoverEndPlus;
+                            hoverEndPlus ||
+                            hoverProductionToggle;
 
             setCursor(Cursor.getPredefinedCursor(hand ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
             repaint();
@@ -1241,6 +1575,7 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
             hoverStartPlus = false;
             hoverEndMinus = false;
             hoverEndPlus = false;
+            hoverProductionToggle = false;
             setCursor(Cursor.getDefaultCursor());
             repaint();
         }

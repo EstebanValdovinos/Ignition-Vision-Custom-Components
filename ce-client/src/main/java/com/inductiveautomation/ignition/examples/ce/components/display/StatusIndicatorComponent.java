@@ -300,49 +300,22 @@ public class StatusIndicatorComponent extends JComponent {
         int indicatorCenterX = indicatorX + indicatorDiameter / 2;
         int indicatorCenterY = indicatorY + indicatorDiameter / 2;
 
-        // Multiple ripple pulse effect
+        boolean indicatorVisibleOn = on && !(effectMode == EFFECT_BLINK && !blinkState);
+
+        // Animated pulse effect.
         if (on && effectMode == EFFECT_PULSE) {
-            for (int i = 0; i < RIPPLE_COUNT; i++) {
-                float phaseOffset = (float) i / RIPPLE_COUNT;
-                float rippleProgress = pulseProgress - phaseOffset;
+            paintPulseShadow(g2, indicatorCenterX, indicatorCenterY, indicatorDiameter, pulseBoundsSize);
+        }
 
-                if (rippleProgress < 0f) {
-                    rippleProgress += 1f;
-                }
-
-                int rippleDiameter = (int) (
-                        indicatorDiameter + ((pulseBoundsSize - indicatorDiameter) * rippleProgress)
-                );
-
-                int rippleX = indicatorCenterX - rippleDiameter / 2;
-                int rippleY = indicatorCenterY - rippleDiameter / 2;
-
-                int alpha = (int) (90 * (1f - rippleProgress));
-                alpha = Math.max(0, Math.min(255, alpha));
-
-                if (alpha > 0) {
-                    g2.setColor(new Color(
-                            statusColor.getRed(),
-                            statusColor.getGreen(),
-                            statusColor.getBlue(),
-                            alpha
-                    ));
-                    g2.fillOval(rippleX, rippleY, rippleDiameter, rippleDiameter);
-                }
-            }
+        // Static glow/shadow.
+        // Used by BLINK and NONE while the indicator is visibly ON.
+        // This gives the same visual status emphasis as pulse, but without the expanding animation.
+        if (indicatorVisibleOn && effectMode != EFFECT_PULSE) {
+            paintStaticStatusShadow(g2, indicatorCenterX, indicatorCenterY, indicatorDiameter, pulseBoundsSize);
         }
 
         // Main indicator
-        Color drawColor;
-        if (on) {
-            if (effectMode == EFFECT_BLINK && !blinkState) {
-                drawColor = offColor;
-            } else {
-                drawColor = statusColor;
-            }
-        } else {
-            drawColor = offColor;
-        }
+        Color drawColor = indicatorVisibleOn ? statusColor : offColor;
 
         g2.setColor(drawColor);
         g2.fillOval(indicatorX, indicatorY, indicatorDiameter, indicatorDiameter);
@@ -355,5 +328,59 @@ public class StatusIndicatorComponent extends JComponent {
         g2.drawString(text, textX, textY);
 
         g2.dispose();
+    }
+
+    private void paintPulseShadow(Graphics2D g2, int centerX, int centerY, int indicatorDiameter, int pulseBoundsSize) {
+        for (int i = 0; i < RIPPLE_COUNT; i++) {
+            float phaseOffset = (float) i / RIPPLE_COUNT;
+            float rippleProgress = pulseProgress - phaseOffset;
+
+            if (rippleProgress < 0f) {
+                rippleProgress += 1f;
+            }
+
+            int rippleDiameter = (int) (
+                    indicatorDiameter + ((pulseBoundsSize - indicatorDiameter) * rippleProgress)
+            );
+
+            int rippleX = centerX - rippleDiameter / 2;
+            int rippleY = centerY - rippleDiameter / 2;
+
+            int alpha = (int) (90 * (1f - rippleProgress));
+            alpha = Math.max(0, Math.min(255, alpha));
+
+            if (alpha > 0) {
+                g2.setColor(withAlpha(statusColor, alpha));
+                g2.fillOval(rippleX, rippleY, rippleDiameter, rippleDiameter);
+            }
+        }
+    }
+
+    private void paintStaticStatusShadow(Graphics2D g2, int centerX, int centerY, int indicatorDiameter, int pulseBoundsSize) {
+        int outerDiameter = pulseBoundsSize;
+        int middleDiameter = indicatorDiameter + Math.max(2, (pulseBoundsSize - indicatorDiameter) / 2);
+
+        //paintCenteredOval(g2, centerX, centerY, outerDiameter, withAlpha(statusColor, 28));
+        paintCenteredOval(g2, centerX, centerY, middleDiameter, withAlpha(statusColor, 55));
+    }
+
+    private void paintCenteredOval(Graphics2D g2, int centerX, int centerY, int diameter, Color color) {
+        int x = centerX - diameter / 2;
+        int y = centerY - diameter / 2;
+
+        g2.setColor(color);
+        g2.fillOval(x, y, diameter, diameter);
+    }
+
+    private Color withAlpha(Color color, int alpha) {
+        Color safeColor = color != null ? color : new Color(56, 174, 78);
+        int safeAlpha = Math.max(0, Math.min(255, alpha));
+
+        return new Color(
+                safeColor.getRed(),
+                safeColor.getGreen(),
+                safeColor.getBlue(),
+                safeAlpha
+        );
     }
 }

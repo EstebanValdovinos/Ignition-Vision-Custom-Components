@@ -2,6 +2,7 @@ package com.inductiveautomation.ignition.examples.ce.beaninfos.input;
 
 import com.inductiveautomation.factorypmi.designer.property.customizers.DynamicPropertyProviderCustomizer;
 import com.inductiveautomation.factorypmi.designer.property.customizers.StyleCustomizer;
+import com.inductiveautomation.ignition.examples.ce.components.display.StatusIndicatorComponent;
 import com.inductiveautomation.ignition.examples.ce.components.input.DateRangePickerComponent;
 import com.inductiveautomation.vision.api.designer.beans.CommonBeanInfo;
 import com.inductiveautomation.vision.api.designer.beans.VisionBeanDescriptor;
@@ -38,6 +39,22 @@ public class DateRangePickerComponentBeanInfo extends CommonBeanInfo {
         addProp("dark", "Dark", "Enables dark theme mode.", CAT_BEHAVIOR, BOUND_MASK);
         addProp("open", "Is Open", "True while the popup is open.", CAT_BEHAVIOR, BOUND_MASK);
         addProp("enabled", "Enabled", "Enables or disables the component.", CAT_BEHAVIOR, PREFERRED_MASK | BOUND_MASK);
+        addEnumProp(
+                "weekStartDay",
+                "Week Start Day",
+                "The start Day of week, Sunday or Monday.",
+                CAT_BEHAVIOR,
+                new int[]{
+                        DateRangePickerComponent.WEEK_START_SUNDAY,
+                        DateRangePickerComponent.WEEK_START_MONDAY
+                },
+                new String[]{
+                        "Sunday",
+                        "Monday"
+                }
+        );
+
+
     }
 
     @Override
