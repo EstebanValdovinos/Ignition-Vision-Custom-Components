@@ -50,6 +50,7 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
     private boolean isOpen = false;
     private int weekStartDay = WEEK_START_SUNDAY;
     private boolean productionDayTimes = false;
+    private boolean selectFutureDates = true;
 
     private float chevronRotation = 0f;
     private final Timer chevronTimer;
@@ -262,6 +263,20 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
         firePropertyChange("productionDayTimes", old, this.productionDayTimes);
         if (popupPanel != null) {
             popupPanel.revalidateTimeFields();
+            popupPanel.repaint();
+        }
+        repaint();
+    }
+
+    public boolean isSelectFutureDates() {
+        return selectFutureDates;
+    }
+
+    public void setSelectFutureDates(boolean selectFutureDates) {
+        boolean old = this.selectFutureDates;
+        this.selectFutureDates = selectFutureDates;
+        firePropertyChange("selectFutureDates", old, this.selectFutureDates);
+        if (popupPanel != null) {
             popupPanel.repaint();
         }
         repaint();
@@ -830,7 +845,8 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
 
                 int weekNum = weekStart.get(WeekFields.of(getFirstDayOfWeek(), 1).weekOfWeekBasedYear());
                 Rectangle weekRect = new Rectangle(gridX, rowY, weekColW, cellH);
-                boolean hoverWeek = left ? (hoverWeekLeft == gridRow) : (hoverWeekRight == gridRow);
+                boolean hoverWeek = (left ? (hoverWeekLeft == gridRow) : (hoverWeekRight == gridRow))
+                        && canSelectWeek(weekStart);
 
                 g2.setColor(hoverWeek ? primaryColor : t.weekNumber);
                 Font weekNumberFont = hoverWeek ? dayFont.deriveFont(Font.BOLD) : dayFont;
@@ -853,7 +869,9 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
 
                     boolean inThisMonth = YearMonth.from(cellDate).equals(month);
                     boolean isToday = cellDate.equals(today);
-                    boolean isHover = hoverLocalDate != null && cellDate.equals(hoverLocalDate) && inThisMonth;
+                    boolean futureBlocked = !DateRangePickerComponent.this.isSelectFutureDates()
+                            && inThisMonth && cellDate.isAfter(today);
+                    boolean isHover = hoverLocalDate != null && cellDate.equals(hoverLocalDate) && inThisMonth && !futureBlocked;
                     boolean isStart = cellDate.equals(workingStart.toLocalDate());
                     boolean isEnd = cellDate.equals(workingEnd.toLocalDate());
 
@@ -914,6 +932,8 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
                         g2.setColor(dark ? new Color(45, 48, 54) : t.text);
                     } else if (!inThisMonth) {
                         g2.setColor(t.overflowText);
+                    } else if (futureBlocked) {
+                        g2.setColor(t.textMuted);
                     } else {
                         g2.setColor(t.text);
                     }
@@ -1309,8 +1329,22 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
             return !YearMonth.from(date).equals(month);
         }
 
+        private boolean canSelectDate(LocalDate date) {
+            if (date == null || DateRangePickerComponent.this.isSelectFutureDates()) {
+                return date != null;
+            }
+            return !date.isAfter(LocalDate.now());
+        }
+
+        private boolean canSelectWeek(LocalDate weekStart) {
+            if (DateRangePickerComponent.this.isSelectFutureDates()) {
+                return true;
+            }
+            return !weekStart.isAfter(LocalDate.now());
+        }
+
         private void handleDaySelection(LocalDate clicked) {
-            if (clicked == null) {
+            if (!canSelectDate(clicked)) {
                 return;
             }
 
@@ -1341,6 +1375,10 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
 
         private void handleWeekSelection(YearMonth month, int visibleRow) {
             LocalDate weekStart = calendarGridStart(month).plusDays(visibleRow * 7L);
+            if (!canSelectWeek(weekStart)) {
+                return;
+            }
+
             LocalDate weekEnd = weekStart.plusDays(6);
 
             LocalDateTime[] range = rangeForWholeDays(weekStart, weekEnd);
@@ -1677,21 +1715,27 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
 
             Integer wl = weekRowAtMonth(leftMonthRect, e.getX(), e.getY());
             if (wl != null) {
-                hoverWeekLeft = wl;
+                LocalDate weekStart = calendarGridStart(leftMonth).plusDays(wl * 7L);
+                if (canSelectWeek(weekStart)) {
+                    hoverWeekLeft = wl;
+                }
             }
 
             Integer wr = weekRowAtMonth(rightMonthRect, e.getX(), e.getY());
             if (wr != null) {
-                hoverWeekRight = wr;
+                LocalDate weekStart = calendarGridStart(leftMonth.plusMonths(1)).plusDays(wr * 7L);
+                if (canSelectWeek(weekStart)) {
+                    hoverWeekRight = wr;
+                }
             }
 
             LocalDate leftDate = dateAtMonthCell(leftMonthRect, e.getX(), e.getY());
             LocalDate rightDate = dateAtMonthCell(rightMonthRect, e.getX(), e.getY());
 
             LocalDate d = null;
-            if (leftDate != null && !isOverflowCell(leftMonthRect, leftDate)) {
+            if (leftDate != null && !isOverflowCell(leftMonthRect, leftDate) && canSelectDate(leftDate)) {
                 d = leftDate;
-            } else if (rightDate != null && !isOverflowCell(rightMonthRect, rightDate)) {
+            } else if (rightDate != null && !isOverflowCell(rightMonthRect, rightDate) && canSelectDate(rightDate)) {
                 d = rightDate;
             }
 

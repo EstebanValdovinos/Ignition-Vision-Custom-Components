@@ -37,6 +37,7 @@ public class DateRangePickerComponentBeanInfo extends CommonBeanInfo {
         addProp("font", "Font", "The font used for the component text.", CAT_APPEARANCE, PREFERRED_MASK | BOUND_MASK);
 
         addProp("dark", "Dark", "Enables dark theme mode.", CAT_BEHAVIOR, BOUND_MASK);
+        addProp("selectFutureDates", "Select Future Dates", "If True, allow future date selection. Set to False to block future date selection.", CAT_BEHAVIOR, BOUND_MASK);
         addProp("open", "Is Open", "True while the popup is open.", CAT_BEHAVIOR, BOUND_MASK);
         addProp("enabled", "Enabled", "Enables or disables the component.", CAT_BEHAVIOR, PREFERRED_MASK | BOUND_MASK);
         addEnumProp(
