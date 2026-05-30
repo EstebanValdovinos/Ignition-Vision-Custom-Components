@@ -810,7 +810,7 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
             int sectionGap = 36;
             int sectionW = (w - sectionGap) / 2;
 
-            int buttonSize = 16;
+            int buttonSize = 20;
             int buttonGap = 8;
 
             int startX = x;
@@ -836,13 +836,13 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
 
             int sliderWidth = sectionW - ((buttonSize * 2) + (buttonGap * 2)) - 10;
 
-            startMinusRect.setBounds(startX, sliderY - 8, buttonSize, buttonSize);
+            startMinusRect.setBounds(startX, sliderY - 10, buttonSize, buttonSize);
             startSliderRect.setBounds(startMinusRect.x + buttonSize + buttonGap, sliderY - 7, sliderWidth, 18);
-            startPlusRect.setBounds(startSliderRect.x + startSliderRect.width + buttonGap, sliderY - 8, buttonSize, buttonSize);
+            startPlusRect.setBounds(startSliderRect.x + startSliderRect.width + buttonGap, sliderY - 10, buttonSize, buttonSize);
 
-            endMinusRect.setBounds(endX, sliderY - 8, buttonSize, buttonSize);
+            endMinusRect.setBounds(endX, sliderY - 10, buttonSize, buttonSize);
             endSliderRect.setBounds(endMinusRect.x + buttonSize + buttonGap, sliderY - 7, sliderWidth, 18);
-            endPlusRect.setBounds(endSliderRect.x + endSliderRect.width + buttonGap, sliderY - 8, buttonSize, buttonSize);
+            endPlusRect.setBounds(endSliderRect.x + endSliderRect.width + buttonGap, sliderY - 10, buttonSize, buttonSize);
 
             paintIconButton(g2, startMinusRect, "-", hoverStartMinus, t);
             paintSlider(g2, startSliderRect, workingStart.getHour() * 60 + workingStart.getMinute(), t);
@@ -925,7 +925,7 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
                     g.fillOval(r.x, r.y, r.width, r.height);
                 }
 
-                g.setFont(getFont().deriveFont(Font.BOLD, 14f));
+                g.setFont(getFont().deriveFont(Font.BOLD, Math.max(14f, r.height * 0.75f)));
                 g.setColor(t.textStrong);
 
                 FontMetrics fm = g.getFontMetrics();
@@ -941,13 +941,14 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
         private void paintFooter(Graphics2D g2, int x, int y, int w, int h, Theme t) {
             int pad = 12;
 
-            String startTxt = FOOTER_FORMAT.format(workingStart);
-            String endTxt = FOOTER_FORMAT.format(workingEnd);
+            String footerTxt = "From: " + FOOTER_FORMAT.format(workingStart)
+                    + " | To: " + FOOTER_FORMAT.format(workingEnd);
 
             g2.setFont(getFont().deriveFont(Font.PLAIN, 11f));
             g2.setColor(t.textMuted);
-            g2.drawString(startTxt, x + pad, y + 17);
-            g2.drawString(endTxt, x + pad, y + 35);
+            FontMetrics fm = g2.getFontMetrics();
+            int ty = y + (h - fm.getHeight()) / 2 + fm.getAscent();
+            g2.drawString(footerTxt, x + pad, ty);
 
             int btnH = 30;
             int btnW = 74;
