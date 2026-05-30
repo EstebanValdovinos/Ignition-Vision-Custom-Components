@@ -55,6 +55,7 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
     private final Timer chevronTimer;
 
     private final Image headerIcon = loadHeaderIcon();
+    private final Image presetLogo = loadImage("/images/tesla_logo.png");
 
     private final JPopupMenu popupMenu;
     private final PopupPanel popupPanel;
@@ -439,21 +440,29 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
     // Popup panel
     // ---------------------------------------------------------------------
 
-    private class PopupPanel extends JPanel implements MouseListener, MouseMotionListener {
+    private class PopupPanel extends JPanel implements MouseListener, MouseMotionListener, MouseWheelListener {
 
-        private final int popupW = 790;
-        private final int popupH = 460;
+        private final int popupW = 814;
 
         private final int panelRadius = 8;
 
-        private final int presetPanelW = 168;
+        private final int presetPanelW = 192;
+        private final int presetLogoSize = 64;
         private final int footerH = 52;
         private final int sliderAreaH = 112;
         private final int monthHeaderH = 28;
+        private final int monthHeaderGap = 10;
         private final int weekHeaderH = 22;
         private final int cellH = 34;
         private final int weekColW = 30;
         private final int monthGap = 14;
+        private final int weekRowCount = 6;
+        private final int calendarTopPad = 12;
+        private final int calendarSliderGap = 10;
+        private final int presetRowH = 32;
+        private final int presetScrollbarW = 8;
+        private final int calendarH = monthHeaderH + monthHeaderGap + weekHeaderH + weekRowCount * cellH;
+        private final int popupH = footerH + calendarTopPad + calendarH + calendarSliderGap + sliderAreaH;
 
         private LocalDateTime workingStart;
         private LocalDateTime workingEnd;
@@ -500,7 +509,13 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
         private Rectangle leftPrevRect = new Rectangle();
         private Rectangle rightNextRect = new Rectangle();
 
-        private final List<Rectangle> presetRects = new ArrayList<Rectangle>();
+        private Rectangle presetListRect = new Rectangle();
+        private Rectangle presetScrollTrackRect = new Rectangle();
+        private Rectangle presetScrollThumbRect = new Rectangle();
+        private int presetScrollOffset = 0;
+        private boolean draggingPresetScroll = false;
+        private int presetScrollDragAnchorY = 0;
+        private int presetScrollDragAnchorOffset = 0;
 
         private LocalDate firstClickDate = null;
 
@@ -533,6 +548,7 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
             add(endTimeField);
             addMouseListener(this);
             addMouseMotionListener(this);
+            addMouseWheelListener(this);
         }
 
         void beginSession() {
@@ -565,6 +581,8 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
             hoverProductionToggle = false;
             draggingStartSlider = false;
             draggingEndSlider = false;
+            draggingPresetScroll = false;
+            presetScrollOffset = 0;
             setCursor(Cursor.getDefaultCursor());
             syncTimeFields();
 
@@ -599,7 +617,7 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
                 g2.drawLine(panelX, contentBottom, panelX + panelW, contentBottom);
 
                 paintPresets(g2, panelX + 10, panelY + 14, presetPanelW - 20, contentBottom - panelY - 20, t);
-                paintMonths(g2, panelX + presetPanelW + 12, panelY + 12, panelW - presetPanelW - 24, contentBottom - panelY - sliderAreaH - 18, t);
+                paintMonths(g2, panelX + presetPanelW + 12, panelY + calendarTopPad, panelW - presetPanelW - 24, calendarH, t);
                 paintSliders(g2, panelX + presetPanelW + 18, contentBottom - sliderAreaH + 10, panelW - presetPanelW - 36, sliderAreaH - 10, t);
                 paintFooter(g2, panelX, panelY + panelH - footerH, panelW, footerH, t);
             } finally {
@@ -608,40 +626,135 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
         }
 
         private void paintPresets(Graphics2D g2, int x, int y, int w, int h, Theme t) {
-            presetRects.clear();
+            int contentY = y;
+            int logoGap = 8;
+
+            if (presetLogo != null) {
+                int logoX = x + (w - presetLogoSize) / 2;
+                g2.drawImage(presetLogo, logoX, contentY, presetLogoSize, presetLogoSize, null);
+                contentY += presetLogoSize + logoGap;
+            }
 
             int toggleH = 22;
-            productionToggleRect.setBounds(x + 2, y, w - 4, toggleH);
+            productionToggleRect.setBounds(x + 2, contentY, w - 4, toggleH);
             paintProductionToggle(g2, productionToggleRect, t);
+            contentY += toggleH + 8;
 
-            Font normal = getFont().deriveFont(Font.PLAIN, 11f);
-            Font hoverFont = normal.deriveFont(Font.BOLD);
+            int listY = contentY;
+            int listH = Math.max(0, y + h - listY);
+            int maxScroll = maxPresetScrollOffset(listH);
+            presetScrollOffset = clamp(presetScrollOffset, 0, maxScroll);
 
-            int topGap = 36;
-            int rowH = 24;
-            int itemH = 20;
-            for (int i = 0; i < presets.length; i++) {
-                int ry = y + topGap + i * rowH;
-                Rectangle r = new Rectangle(x, ry, w, itemH);
-                presetRects.add(r);
+            boolean scrollNeeded = maxScroll > 0;
+            int listW = scrollNeeded ? w - presetScrollbarW - 4 : w;
+            presetListRect.setBounds(x, listY, listW, listH);
 
-                boolean active = isPresetActive(i);
-                boolean hover = (i == hoverPreset);
+            Graphics2D listG = (Graphics2D) g2.create();
+            try {
+                listG.clipRect(x, listY, listW, listH);
 
-                if (active) {
-                    g2.setColor(withAlpha(primaryColor, dark ? 42 : 24));
-                    g2.fillRoundRect(r.x, r.y, r.width, r.height, 4, 4);
-                } else if (hover) {
-                    g2.setColor(t.hoverSoft);
-                    g2.fillRoundRect(r.x, r.y, r.width, r.height, 4, 4);
+                Font normal = getFont().deriveFont(Font.PLAIN, 11f);
+                Font hoverFont = normal.deriveFont(Font.BOLD);
+
+                for (int i = 0; i < presets.length; i++) {
+                    int ry = listY + i * presetRowH - presetScrollOffset;
+                    if (ry + presetRowH <= listY || ry >= listY + listH) {
+                        continue;
+                    }
+
+                    Rectangle r = new Rectangle(x, ry, listW, presetRowH);
+                    boolean active = isPresetActive(i);
+                    boolean hover = (i == hoverPreset);
+
+                    if (active) {
+                        listG.setColor(withAlpha(primaryColor, dark ? 42 : 24));
+                        listG.fillRoundRect(r.x, r.y, r.width, r.height, 4, 4);
+                    } else if (hover) {
+                        listG.setColor(t.hoverSoft);
+                        listG.fillRoundRect(r.x, r.y, r.width, r.height, 4, 4);
+                    }
+
+                    listG.setFont((hover || active) ? hoverFont : normal);
+                    listG.setColor(active ? primaryColor : t.text);
+                    FontMetrics fm = listG.getFontMetrics();
+                    int ty = r.y + (r.height - fm.getHeight()) / 2 + fm.getAscent();
+                    listG.drawString(presets[i], r.x + 8, ty);
                 }
-
-                g2.setFont((hover || active) ? hoverFont : normal);
-                g2.setColor(active ? primaryColor : t.text);
-                FontMetrics fm = g2.getFontMetrics();
-                int ty = r.y + (r.height - fm.getHeight()) / 2 + fm.getAscent();
-                g2.drawString(presets[i], r.x + 8, ty);
+            } finally {
+                listG.dispose();
             }
+
+            paintPresetScrollbar(g2, t);
+        }
+
+        private void paintPresetScrollbar(Graphics2D g2, Theme t) {
+            int listH = presetListRect.height;
+            int maxScroll = maxPresetScrollOffset(listH);
+            if (maxScroll <= 0) {
+                presetScrollTrackRect.setBounds(0, 0, 0, 0);
+                presetScrollThumbRect.setBounds(0, 0, 0, 0);
+                return;
+            }
+
+            int trackX = presetListRect.x + presetListRect.width + 2;
+            int trackY = presetListRect.y;
+            int trackH = presetListRect.height;
+            presetScrollTrackRect.setBounds(trackX, trackY, presetScrollbarW, trackH);
+
+            g2.setColor(t.sliderTrack);
+            g2.fillRoundRect(trackX, trackY, presetScrollbarW, trackH, 4, 4);
+
+            int thumbH = Math.max(24, (int) Math.round((listH / (double) presetListHeight()) * trackH));
+            int thumbTravel = Math.max(0, trackH - thumbH);
+            int thumbY = trackY + (maxScroll == 0 ? 0 : (int) Math.round((presetScrollOffset / (double) maxScroll) * thumbTravel));
+            presetScrollThumbRect.setBounds(trackX, thumbY, presetScrollbarW, thumbH);
+
+            g2.setColor(t.textMutedStrong);
+            g2.fillRoundRect(trackX, thumbY, presetScrollbarW, thumbH, 4, 4);
+        }
+
+        private int presetListHeight() {
+            return presets.length * presetRowH;
+        }
+
+        private int maxPresetScrollOffset(int viewportH) {
+            return Math.max(0, presetListHeight() - viewportH);
+        }
+
+        private Integer presetIndexAt(Point p) {
+            if (!presetListRect.contains(p)) {
+                return null;
+            }
+
+            int relY = p.y - presetListRect.y + presetScrollOffset;
+            int index = relY / presetRowH;
+            if (index < 0 || index >= presets.length) {
+                return null;
+            }
+
+            int itemY = presetListRect.y + index * presetRowH - presetScrollOffset;
+            if (p.y >= itemY && p.y < itemY + presetRowH) {
+                return index;
+            }
+            return null;
+        }
+
+        private void updatePresetScrollFromDrag(int mouseY) {
+            int listH = presetListRect.height;
+            int maxScroll = maxPresetScrollOffset(listH);
+            if (maxScroll <= 0) {
+                return;
+            }
+
+            int thumbH = presetScrollThumbRect.height;
+            int trackH = presetScrollTrackRect.height;
+            int thumbTravel = Math.max(1, trackH - thumbH);
+            int deltaY = mouseY - presetScrollDragAnchorY;
+            presetScrollOffset = clamp(
+                    presetScrollDragAnchorOffset + (int) Math.round((deltaY / (double) thumbTravel) * maxScroll),
+                    0,
+                    maxScroll
+            );
         }
 
         private void paintMonths(Graphics2D g2, int x, int y, int w, int h, Theme t) {
@@ -687,7 +800,7 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
             int ty = gridY + 18;
             g2.drawString(title, tx, ty);
 
-            int weekHeaderY = gridY + monthHeaderH;
+            int weekHeaderY = gridY + monthHeaderH + monthHeaderGap;
             g2.setFont(weekFont);
             g2.setColor(t.textMuted);
             String[] weekdayLabels = getWeekdayLabels();
@@ -701,19 +814,23 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
                 drawCenteredString(g2, weekdayLabels[i], cx, weekHeaderY + 14);
             }
 
-            List<LocalDate> weekStarts = getVisibleWeekStarts(month);
+            LocalDate gridStart = calendarGridStart(month);
             LocalDate today = LocalDate.now();
 
             int startY = weekHeaderY + weekHeaderH;
             g2.setFont(dayFont);
 
-            for (int visibleRow = 0; visibleRow < weekStarts.size(); visibleRow++) {
-                LocalDate weekStart = weekStarts.get(visibleRow);
-                int rowY = startY + visibleRow * cellH;
+            for (int gridRow = 0; gridRow < weekRowCount; gridRow++) {
+                LocalDate weekStart = gridStart.plusDays(gridRow * 7L);
+                if (!weekContainsMonth(weekStart, month)) {
+                    continue;
+                }
+
+                int rowY = startY + gridRow * cellH;
 
                 int weekNum = weekStart.get(WeekFields.of(getFirstDayOfWeek(), 1).weekOfWeekBasedYear());
                 Rectangle weekRect = new Rectangle(gridX, rowY, weekColW, cellH);
-                boolean hoverWeek = left ? (hoverWeekLeft == visibleRow) : (hoverWeekRight == visibleRow);
+                boolean hoverWeek = left ? (hoverWeekLeft == gridRow) : (hoverWeekRight == gridRow);
 
                 g2.setColor(hoverWeek ? primaryColor : t.weekNumber);
                 Font weekNumberFont = hoverWeek ? dayFont.deriveFont(Font.BOLD) : dayFont;
@@ -856,20 +973,21 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
         private void paintProductionToggle(Graphics2D g2, Rectangle r, Theme t) {
             boolean active = DateRangePickerComponent.this.isProductionDayTimes();
 
-            int trackW = 34;
-            int trackH = 16;
+            int trackW = 40;
+            int trackH = 20;
             int trackX = r.x + 2;
             int trackY = r.y + (r.height - trackH) / 2;
+            int trackArc = trackH;
 
             if (hoverProductionToggle && !active) {
                 g2.setColor(withAlpha(primaryColor, dark ? 36 : 18));
-                g2.fillRoundRect(trackX - 2, trackY - 2, trackW + 4, trackH + 4, 10, 10);
+                g2.fillRoundRect(trackX - 2, trackY - 2, trackW + 4, trackH + 4, trackArc + 4, trackArc + 4);
             }
 
             g2.setColor(active ? primaryColor : t.sliderTrack);
-            g2.fillRoundRect(trackX, trackY, trackW, trackH, 8, 8);
+            g2.fillRoundRect(trackX, trackY, trackW, trackH, trackArc, trackArc);
 
-            int knobD = 12;
+            int knobD = trackH - 4;
             int knobX = active ? trackX + trackW - knobD - 2 : trackX + 2;
             int knobY = trackY + 2;
             g2.setColor(t.sliderKnobOuter);
@@ -1109,18 +1227,8 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
             repaint();
         }
 
-        private List<LocalDate> getVisibleWeekStarts(YearMonth month) {
-            List<LocalDate> rows = new ArrayList<LocalDate>();
-            LocalDate firstOfMonth = month.atDay(1);
-            LocalDate gridStart = firstOfMonth.with(TemporalAdjusters.previousOrSame(getFirstDayOfWeek()));
-
-            for (int i = 0; i < 6; i++) {
-                LocalDate weekStart = gridStart.plusDays(i * 7L);
-                if (weekContainsMonth(weekStart, month)) {
-                    rows.add(weekStart);
-                }
-            }
-            return rows;
+        private LocalDate calendarGridStart(YearMonth month) {
+            return month.atDay(1).with(TemporalAdjusters.previousOrSame(getFirstDayOfWeek()));
         }
 
         private boolean weekContainsMonth(LocalDate weekStart, YearMonth month) {
@@ -1133,15 +1241,25 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
         }
 
         private LocalDate dateAtMonthCell(Rectangle area, int mx, int my) {
-            List<LocalDate> weekStarts = getVisibleWeekStarts(area == leftMonthRect ? leftMonth : leftMonth.plusMonths(1));
+            YearMonth month = area == leftMonthRect ? leftMonth : leftMonth.plusMonths(1);
+            LocalDate gridStart = calendarGridStart(month);
             int dayColW = (area.width - weekColW) / 7;
-            int startY = area.y + monthHeaderH + weekHeaderH;
+            int startY = area.y + monthHeaderH + monthHeaderGap + weekHeaderH;
 
-            if (my < startY || my >= startY + weekStarts.size() * cellH) {
+            if (my < startY || my >= startY + weekRowCount * cellH) {
                 return null;
             }
 
             int row = (my - startY) / cellH;
+            if (row < 0 || row >= weekRowCount) {
+                return null;
+            }
+
+            LocalDate weekStart = gridStart.plusDays(row * 7L);
+            if (!weekContainsMonth(weekStart, month)) {
+                return null;
+            }
+
             int relX = mx - area.x;
 
             if (relX < weekColW) {
@@ -1153,14 +1271,15 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
                 return null;
             }
 
-            return weekStarts.get(row).plusDays(col);
+            return weekStart.plusDays(col);
         }
 
         private Integer weekRowAtMonth(Rectangle area, int mx, int my) {
-            List<LocalDate> weekStarts = getVisibleWeekStarts(area == leftMonthRect ? leftMonth : leftMonth.plusMonths(1));
-            int startY = area.y + monthHeaderH + weekHeaderH;
+            YearMonth month = area == leftMonthRect ? leftMonth : leftMonth.plusMonths(1);
+            LocalDate gridStart = calendarGridStart(month);
+            int startY = area.y + monthHeaderH + monthHeaderGap + weekHeaderH;
 
-            if (my < startY || my >= startY + weekStarts.size() * cellH) {
+            if (my < startY || my >= startY + weekRowCount * cellH) {
                 return null;
             }
 
@@ -1169,7 +1288,17 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
                 return null;
             }
 
-            return (my - startY) / cellH;
+            int row = (my - startY) / cellH;
+            if (row < 0 || row >= weekRowCount) {
+                return null;
+            }
+
+            LocalDate weekStart = gridStart.plusDays(row * 7L);
+            if (!weekContainsMonth(weekStart, month)) {
+                return null;
+            }
+
+            return row;
         }
 
         private boolean isOverflowCell(Rectangle area, LocalDate date) {
@@ -1211,8 +1340,7 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
         }
 
         private void handleWeekSelection(YearMonth month, int visibleRow) {
-            List<LocalDate> weekStarts = getVisibleWeekStarts(month);
-            LocalDate weekStart = weekStarts.get(visibleRow);
+            LocalDate weekStart = calendarGridStart(month).plusDays(visibleRow * 7L);
             LocalDate weekEnd = weekStart.plusDays(6);
 
             LocalDateTime[] range = rangeForWholeDays(weekStart, weekEnd);
@@ -1443,11 +1571,10 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
                 return;
             }
 
-            for (int i = 0; i < presetRects.size(); i++) {
-                if (presetRects.get(i).contains(p)) {
-                    applyPreset(i);
-                    return;
-                }
+            Integer presetIdx = presetIndexAt(p);
+            if (presetIdx != null) {
+                applyPreset(presetIdx);
+                return;
             }
 
             Integer leftWeek = weekRowAtMonth(leftMonthRect, p.x, p.y);
@@ -1476,10 +1603,29 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
 
         @Override
         public void mousePressed(MouseEvent e) {
-            if (startSliderRect.contains(e.getPoint())) {
+            Point p = e.getPoint();
+            if (presetScrollThumbRect.contains(p)) {
+                draggingPresetScroll = true;
+                presetScrollDragAnchorY = p.y;
+                presetScrollDragAnchorOffset = presetScrollOffset;
+                return;
+            }
+            if (presetScrollTrackRect.contains(p) && presetScrollTrackRect.height > 0) {
+                int maxScroll = maxPresetScrollOffset(presetListRect.height);
+                if (maxScroll > 0) {
+                    if (p.y < presetScrollThumbRect.y) {
+                        presetScrollOffset = clamp(presetScrollOffset - presetListRect.height, 0, maxScroll);
+                    } else if (p.y > presetScrollThumbRect.y + presetScrollThumbRect.height) {
+                        presetScrollOffset = clamp(presetScrollOffset + presetListRect.height, 0, maxScroll);
+                    }
+                    repaint();
+                }
+                return;
+            }
+            if (startSliderRect.contains(p)) {
                 draggingStartSlider = true;
                 updateSlider(e);
-            } else if (endSliderRect.contains(e.getPoint())) {
+            } else if (endSliderRect.contains(p)) {
                 draggingEndSlider = true;
                 updateSlider(e);
             }
@@ -1489,12 +1635,31 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
         public void mouseReleased(MouseEvent e) {
             draggingStartSlider = false;
             draggingEndSlider = false;
+            draggingPresetScroll = false;
         }
 
         @Override
         public void mouseDragged(MouseEvent e) {
+            if (draggingPresetScroll) {
+                updatePresetScrollFromDrag(e.getY());
+                repaint();
+                return;
+            }
             updateSlider(e);
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        }
+
+        @Override
+        public void mouseWheelMoved(MouseWheelEvent e) {
+            if (!presetListRect.contains(e.getPoint())) {
+                return;
+            }
+            int maxScroll = maxPresetScrollOffset(presetListRect.height);
+            if (maxScroll <= 0) {
+                return;
+            }
+            presetScrollOffset = clamp(presetScrollOffset + e.getWheelRotation() * presetRowH, 0, maxScroll);
+            repaint();
         }
 
         @Override
@@ -1502,11 +1667,9 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
             Point p = e.getPoint();
 
             hoverPreset = -1;
-            for (int i = 0; i < presetRects.size(); i++) {
-                if (presetRects.get(i).contains(p)) {
-                    hoverPreset = i;
-                    break;
-                }
+            Integer presetIdx = presetIndexAt(p);
+            if (presetIdx != null) {
+                hoverPreset = presetIdx;
             }
 
             hoverWeekLeft = -1;
@@ -1558,7 +1721,9 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
                             hoverStartPlus ||
                             hoverEndMinus ||
                             hoverEndPlus ||
-                            hoverProductionToggle;
+                            hoverProductionToggle ||
+                            presetScrollThumbRect.contains(p) ||
+                            presetScrollTrackRect.contains(p);
 
             setCursor(Cursor.getPredefinedCursor(hand ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
             repaint();
@@ -1669,8 +1834,12 @@ public class DateRangePickerComponent extends JComponent implements MouseListene
     // ---------------------------------------------------------------------
 
     private Image loadHeaderIcon() {
+        return loadImage("/images/daterange_picker_icon.png");
+    }
+
+    private Image loadImage(String resourcePath) {
         try {
-            InputStream is = DateRangePickerComponent.class.getResourceAsStream("/images/daterange_picker_icon.png");
+            InputStream is = DateRangePickerComponent.class.getResourceAsStream(resourcePath);
             if (is != null) {
                 try {
                     BufferedImage img = ImageIO.read(is);
